@@ -1,0 +1,272 @@
+<?php
+/*
+Plugin Name: Nextend Google Connect
+Plugin URI: http://nextendweb.com/
+Description: Google connect
+Version: 1.0
+Author: Roland Soos
+License: GPL2
+*/
+
+/*  Copyright 2012  Roland Soos - Nextend  (email : roland@nextendweb.com)
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2, as 
+    published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+define( 'NEW_GOOGLE_LOGIN', 1 );
+if ( ! defined( 'NEW_GOOGLE_LOGIN_PLUGIN_BASENAME' ) )
+	define( 'NEW_GOOGLE_LOGIN_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+  
+/*
+  Sessions required for the profile notices 
+*/
+function new_google_start_session() {
+  if(!session_id()) {
+      session_start();
+  }
+}
+
+function new_google_end_session() {
+  session_destroy ();
+}
+
+add_action('init', 'new_google_start_session', 1);
+add_action('wp_logout', 'new_google_end_session');
+add_action('wp_login', 'new_google_end_session');
+
+/*
+  Creating the required table on installation
+*/
+function new_google_connect_install(){
+  global $wpdb;
+  
+  $table_name = $wpdb->prefix . "social_users";
+    
+  $sql = "CREATE TABLE $table_name (
+    `ID` int(11) NOT NULL,
+    `type` varchar(20) NOT NULL,
+    `identifier` varchar(100) NOT NULL,
+    KEY `ID` (`ID`,`type`)
+  );";
+
+   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+   dbDelta($sql);
+}
+register_activation_hook(__FILE__, 'new_google_connect_install');
+
+/*
+  Adding query vars for the WP parser
+*/
+function new_google_add_query_var(){
+  global $wp;
+  $wp->add_query_var('loginGoogle');
+}
+add_filter('init', 'new_google_add_query_var');
+
+/* -----------------------------------------------------------------------------
+  Main function to handle the Sign in/Register/Linking process
+----------------------------------------------------------------------------- */
+function new_google_login(){
+  global $wp, $wpdb;
+  if($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle'])){
+    include(dirname(__FILE__).'/sdk/init.php');
+    if (isset($_GET['code'])) {
+      $client->authenticate();
+      $_SESSION['token'] = $client->getAccessToken();
+      $redirect = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];
+      header('Location: ' . filter_var(new_google_login_url(), FILTER_SANITIZE_URL));
+      exit;
+    }
+    
+    if (isset($_SESSION['token'])) {
+     $client->setAccessToken($_SESSION['token']);
+    }
+    
+    if (isset($_REQUEST['logout'])) {
+      unset($_SESSION['token']);
+      $client->revokeToken();
+    }
+    
+    if ($client->getAccessToken()) {
+      $u = $oauth2->userinfo->get();
+      
+      // The access token may have been updated lazily.
+      $_SESSION['token'] = $client->getAccessToken();
+    
+      // These fields are currently filtered through the PHP sanitize filters.
+      // See http://www.php.net/manual/en/filter.filters.sanitize.php
+      $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
+      
+      $ID = $wpdb->get_var($wpdb->prepare('
+        SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "'.$u['id'].'"
+      '));
+      if(!is_user_logged_in()){
+        if($ID == NULL){ // Register
+          $ID = email_exists($email);
+          if($ID == false){ // Real register
+            $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
+            $ID = wp_create_user( 'Google - '.$u['name'], $random_password, $email );
+          }
+          $wpdb->insert( 
+          	$wpdb->prefix.'social_users', 
+          	array( 
+          		'ID' => $ID, 
+          		'type' => 'google',
+              'identifier' => $u['id']
+          	), 
+          	array( 
+          		'%d', 
+          		'%s',
+              '%s'
+          	)
+          );
+        }
+        if($ID){ // Login
+          wp_set_auth_cookie($ID, true, false);
+          header( 'Location: '.$_SESSION['redirect'] );
+          unset($_SESSION['redirect']);
+          exit;
+        }
+      }else{
+        $current_user = wp_get_current_user();
+        if($current_user->ID == $ID){ // It was a simple login
+          header( 'Location: '.$_SESSION['redirect'] );
+          unset($_SESSION['redirect']);
+          exit;
+        }elseif($ID === NULL){  // Let's connect the accout to the current user!
+          $wpdb->insert( 
+          	$wpdb->prefix.'social_users', 
+          	array( 
+          		'ID' => $current_user->ID, 
+          		'type' => 'google',
+              'identifier' => $u['id']
+          	), 
+          	array( 
+          		'%d', 
+          		'%s',
+              '%s'
+          	) 
+          );
+          $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
+          header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
+          unset($_SESSION['redirect']);
+          exit;
+        }else{
+          $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
+          header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
+          unset($_SESSION['redirect']);
+          exit;
+        }
+      }
+    } else {
+      $_SESSION['redirect'] = isset($_GET['redirect']) ? $_GET['redirect'] : site_url();
+      header('LOCATION: '.$client->createAuthUrl());
+      exit;
+    }
+    exit;
+  }
+}
+add_action('parse_request', new_google_login);
+
+/*
+  Is the current user connected the Google profile? 
+*/
+function new_google_is_user_connected(){
+  global $wpdb;
+  $current_user = wp_get_current_user();
+  $ID = $wpdb->get_var($wpdb->prepare('
+    SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "'.$current_user->ID.'"
+  '));
+  if($ID === NULL) return false;
+  return true;
+}
+
+/*
+  Connect Field in the Profile page
+*/
+function new_add_google_connect_field() {
+  global $new_is_social_header;
+  if($new_is_social_header === NULL){
+    ?>
+    <h3>Social connect</h3>
+    <?php
+    $new_is_social_header = true;
+  }
+  ?>
+  <table class="form-table">
+    <tbody>
+      <tr>	
+        <th>
+          <label>Link Google with this profile</label>
+        </th>	
+        <td>
+          <?php if(!new_google_is_user_connected()): ?>
+            <a href="<?php echo new_google_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"]; ?>">Link Google with this profile</a>
+          <?php else: ?>
+          Already connected
+          <?php endif; ?>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <?php
+}
+add_action('profile_personal_options', 'new_add_google_connect_field');
+
+/* 
+  Options Page 
+*/
+require_once(trailingslashit(dirname(__FILE__)) . "nextend-google-settings.php");
+
+if(class_exists('NextendGoogleSettings')) {
+	$nextendgooglesettings = new NextendGoogleSettings();
+	
+	if(isset($nextendgooglesettings)) {
+		add_action('admin_menu', array(&$nextendgooglesettings, 'NextendGoogle_Menu'), 1);
+	}
+}
+
+add_filter( 'plugin_action_links', 'new_google_plugin_action_links', 10, 2 );
+
+function new_google_plugin_action_links( $links, $file ) {
+  if ( $file != NEW_GOOGLE_LOGIN_PLUGIN_BASENAME )
+  	return $links;
+	$settings_link = '<a href="' . menu_page_url( 'nextend-google-connect', false ) . '">'
+		. esc_html( __( 'Settings', 'nextend-google-connect' ) ) . '</a>';
+
+	array_unshift( $links, $settings_link );
+
+	return $links;
+}
+
+
+/* -----------------------------------------------------------------------------
+  Miscellaneous functions
+----------------------------------------------------------------------------- */
+function new_google_login_url(){
+  return site_url('index.php').'?loginGoogle=1';
+}
+
+/*
+  Session notices used in the profile settings
+*/
+function new_google_admin_notice(){
+  if(isset($_SESSION['new_google_admin_notice'])){
+    echo '<div class="updated">
+       <p>'.$_SESSION['new_google_admin_notice'].'</p>
+    </div>';
+    unset($_SESSION['new_google_admin_notice']);
+  }
+}
+add_action('admin_notices', 'new_google_admin_notice');

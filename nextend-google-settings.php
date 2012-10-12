@@ -1,0 +1,153 @@
+<?php
+/*
+Nextend Google Connect Settings Page
+*/
+
+$newfb_status = "normal";
+
+if(isset($_POST['newgoogle_update_options'])) {
+	if($_POST['newgoogle_update_options'] == 'Y') {
+		update_option("nextend_google_connect", maybe_serialize($_POST));
+		$newgoogle_status = 'update_success';
+	}
+}
+
+if(!class_exists('NextendGoogleSettings')) {
+class NextendGoogleSettings {
+function NextendGoogle_Options_Page() {
+  $domain = get_option('siteurl');
+  $domain = str_replace(array('http://', 'https://'), array('',''), $domain);
+  $domain = str_replace('www.', '', $domain);
+  $a = explode("/",$domain);
+  $domain = $a[0]; 
+	?>
+
+	<div class="wrap">
+	<div id="newgoogle-options">
+	<div id="newgoogle-title"><h2>Nextend Google Connect Settings</h2></div>
+	<?php
+	global $newgoogle_status;
+	if($newgoogle_status == 'update_success')
+		$message =__('Configuration updated', 'nextend-google-connect') . "<br />";
+	else if($newgoogle_status == 'update_failed')
+		$message =__('Error while saving options', 'nextend-google-connect') . "<br />";
+	else
+		$message = '';
+
+	if($message != "") {
+	?>
+		<div class="updated"><strong><p><?php
+		echo $message;
+		?></p></strong></div><?php
+	} ?>
+	<div id="newgoogle-desc">
+	<p><?php _e('This plugins helps you create Google login and register buttons. The login and register process only takes one click and you can fully customize the buttons with images and other assets.', 'nextend-google-connect'); ?></p>
+	<h3><?php _e('Setup', 'nextend-google-connect'); ?></h3>
+  <p>
+  <?php _e('<ol><li><a href="https://www.google.com/accounts/ManageDomains" target="_blank">Add your domain to Google system!</a></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>The bottom of the page will contain a link to your domain. Click on it and follow Google\'s veryfication steps.</li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>After you are done, <a href="https://code.google.com/apis/console" target="_blank">We have to create and API access.</a></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Create a new API access with your product name.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi11.png" /></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Search for the Google+ API row and enable the service</li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Then click on the API access panel and create and OAuth 2 clien ID!<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi21.png" /></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Product name can be anything then click on next.</li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Click on the <b>more options</b> link and copy and paste <b>'.new_google_login_url().'</b> to the textarea.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi31.png" /></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li>Now you should use the values in the fields below.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi4.png" /></li>', 'nextend-google-connect'); ?>
+  <?php _e('<li><b>Save changes!</b></li></ol>', 'nextend-google-connect'); ?>
+  
+  
+  </p>
+  <h3><?php _e('Usage', 'nextend-google-connect'); ?></h3>
+  <h4><?php _e('Simple link', 'nextend-google-connect'); ?></h4>
+	<p><?php _e('&lt;a href="'.get_option('siteurl').'?logingoogle=1&redirect='.get_option('siteurl').'" onclick="window.location = \''.get_option('siteurl').'?logingoogle=1&redirect=\'+window.location.href; return false;"&gt;Click here to login or register with google&lt;/a&gt;', 'nextend-google-connect'); ?></p>
+	
+  <h4><?php _e('Image button', 'nextend-google-connect'); ?></h4>
+	<p><?php _e('&lt;a href="'.get_option('siteurl').'?logingoogle=1&redirect='.get_option('siteurl').'" onclick="window.location = \''.get_option('siteurl').'?logingoogle=1&redirect=\'+window.location.href; return false;"&gt; &lt;img src="HereComeTheImage" /&gt; &lt;/a&gt;', 'nextend-google-connect'); ?></p>
+  
+  <h3><?php _e('Note', 'nextend-google-connect'); ?></h3>
+  <p><?php _e('If the google user\'s email address already used by another member of your site, the google profile will be automatically linked to the existing profile!', 'nextend-google-connect'); ?></p>
+  
+  </div>
+
+	<!--right-->
+	<div class="postbox-container" style="float:right;width:30%;">
+	<div class="metabox-holder">
+	<div class="meta-box-sortables">
+
+	<!--about-->
+	<div id="newgoogle-about" class="postbox">
+	<h3 class="hndle"><?php _e('About this plugin', 'nextend-google-connect'); ?></h3>
+	<div class="inside"><ul>
+	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/"><?php _e('Plugin URI', 'nextend-google-connect'); ?></a></li>
+	<li><a href="http://profiles.wordpress.org/nextendweb" target="_blank"><?php _e('Author URI', 'nextend-google-connect'); ?></a></li>
+	</ul></div>
+	</div>
+	<!--about end-->
+
+	<!--others-->
+	<!--others end-->
+
+	</div></div></div>
+	<!--right end-->
+
+	<!--left-->
+	<div class="postbox-container" style="float:left;width: 69%;">
+	<div class="metabox-holder">
+	<div class="meta-box-sortabless">
+
+	<!--setting-->
+	<div id="newgoogle-setting" class="postbox">
+	<h3 class="hndle"><?php _e('Settings', 'nextend-google-connect'); ?></h3>
+	<?php $nextend_google_connect = maybe_unserialize(get_option('nextend_google_connect')); ?>
+
+	<form method="post" action="<?php echo get_bloginfo("wpurl"); ?>/wp-admin/options-general.php?page=nextend-google-connect">
+	<input type="hidden" name="newgoogle_update_options" value="Y">
+
+	<table class="form-table">
+		<tr>
+		<th scope="row"><?php _e('Google Client ID:', 'nextend-google-connect'); ?></th>
+		<td>
+		<input type="text" name="google_client_id" value="<?php echo $nextend_google_connect['google_client_id']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
+		<th scope="row"><?php _e('Google Client Secret:', 'nextend-google-connect'); ?></th>
+		<td>
+		<input type="text" name="google_client_secret" value="<?php echo $nextend_google_connect['google_client_secret']; ?>" />
+		</td>
+		</tr>
+    
+    <tr>
+		<th scope="row"><?php _e('Google API key:', 'nextend-google-connect'); ?></th>
+		<td>
+		<input type="text" name="google_api_key" value="<?php echo $nextend_google_connect['google_api_key']; ?>" />
+		</td>
+		</tr>
+	</table>
+
+	<p class="submit">
+	<input style="margin-left: 10%;" type="submit" name="Submit" value="<?php _e('Save Changes', 'nextend-google-connect'); ?>" />
+	</p>
+	</form>
+	</div>
+	<!--setting end-->
+
+	<!--others-->
+	<!--others end-->
+
+	</div></div></div>
+	<!--left end-->
+
+	</div>
+	</div>
+	<?php
+}
+
+function NextendGoogle_Menu() {
+	add_options_page(__('Nextend Google Connect'), __('Nextend Google Connect'), 'manage_options', 'nextend-google-connect', array(__CLASS__,'NextendGoogle_Options_Page'));
+}
+
+}
+}
+?>
