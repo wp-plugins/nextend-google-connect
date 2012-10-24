@@ -46,6 +46,16 @@ add_action('wp_logout', 'new_google_end_session');
 add_action('wp_login', 'new_google_end_session');
 
 /*
+  Loading style for buttons
+*/
+function nextend_google_connect_stylesheet(){
+  wp_register_style( 'nextend_google_connect_stylesheet', plugins_url('buttons/google-btn.css', __FILE__) );
+  wp_enqueue_style( 'nextend_google_connect_stylesheet' );
+}
+
+add_action( 'wp_enqueue_scripts', 'nextend_google_connect_stylesheet' );
+
+/*
   Creating the required table on installation
 */
 function new_google_connect_install(){
@@ -224,6 +234,32 @@ function new_add_google_connect_field() {
 }
 add_action('profile_personal_options', 'new_add_google_connect_field');
 
+function new_add_google_login_form(){
+  ?>
+  <script>
+  if(jQuery.type(has_social_form) === "undefined"){
+    var has_social_form = false;
+    var socialLogins = null;
+  }
+  jQuery(document).ready(function(){
+    (function($) {
+      if(!has_social_form){
+        has_social_form = true;
+        var loginForm = $('#loginform');
+        socialLogins = $('<div class="newsociallogins"><div style="clear:both;"></div></div>');
+        loginForm.prepend("<h3 style='text-align:center;'>OR</h3>");
+        loginForm.prepend(socialLogins);
+        console.log(socialLogins);
+      }
+      socialLogins.prepend('<?php echo addslashes(new_google_sign_button()); ?>');
+    }(jQuery));
+  });
+  </script>
+  <?php
+}
+
+add_action('login_form', 'new_add_google_login_form');
+
 /* 
   Options Page 
 */
@@ -254,6 +290,10 @@ function new_google_plugin_action_links( $links, $file ) {
 /* -----------------------------------------------------------------------------
   Miscellaneous functions
 ----------------------------------------------------------------------------- */
+function new_google_sign_button(){
+  return '<a href="'.new_google_login_url().'">Sign in with Google</a><br />';
+}
+
 function new_google_login_url(){
   return site_url('index.php').'?loginGoogle=1';
 }
