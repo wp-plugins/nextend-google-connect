@@ -28,6 +28,8 @@ define( 'NEW_GOOGLE_LOGIN', 1 );
 if ( ! defined( 'NEW_GOOGLE_LOGIN_PLUGIN_BASENAME' ) )
 	define( 'NEW_GOOGLE_LOGIN_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
   
+$new_google_settings = maybe_unserialize(get_option('nextend_google_connect'));
+
 /*
   Sessions required for the profile notices 
 */
@@ -53,7 +55,11 @@ function nextend_google_connect_stylesheet(){
   wp_enqueue_style( 'nextend_google_connect_stylesheet' );
 }
 
-add_action( 'wp_enqueue_scripts', 'nextend_google_connect_stylesheet' );
+if($new_google_settings['google_load_style']){
+  add_action( 'wp_enqueue_scripts', 'nextend_google_connect_stylesheet' );
+  add_action( 'login_enqueue_scripts', 'nextend_google_connect_stylesheet' );
+  add_action( 'admin_enqueue_scripts', 'nextend_google_connect_stylesheet' );
+}
 
 /*
   Creating the required table on installation
@@ -217,14 +223,10 @@ function new_add_google_connect_field() {
   <table class="form-table">
     <tbody>
       <tr>	
-        <th>
-          <label>Link Google with this profile</label>
-        </th>	
+        <th></th>	
         <td>
           <?php if(!new_google_is_user_connected()): ?>
-            <a href="<?php echo new_google_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"]; ?>">Link Google with this profile</a>
-          <?php else: ?>
-          Already connected
+            <?php echo new_google_link_button() ?>
           <?php endif; ?>
         </td>
       </tr>
@@ -246,7 +248,7 @@ function new_add_google_login_form(){
       if(!has_social_form){
         has_social_form = true;
         var loginForm = $('#loginform');
-        socialLogins = $('<div class="newsociallogins"><div style="clear:both;"></div></div>');
+        socialLogins = $('<div class="newsociallogins" style="text-align: center;"><div style="clear:both;"></div></div>');
         loginForm.prepend("<h3 style='text-align:center;'>OR</h3>");
         loginForm.prepend(socialLogins);
         console.log(socialLogins);
@@ -291,7 +293,13 @@ function new_google_plugin_action_links( $links, $file ) {
   Miscellaneous functions
 ----------------------------------------------------------------------------- */
 function new_google_sign_button(){
-  return '<a href="'.new_google_login_url().'">Sign in with Google</a><br />';
+  global $new_google_settings;
+  return '<a href="'.new_google_login_url().'">'.$new_google_settings['google_login_button'].'</a><br />';
+}
+
+function new_google_link_button(){
+  global $new_google_settings;
+  return '<a href="'.new_fb_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"].'">'.$new_google_settings['google_link_button'].'</a><br />';
 }
 
 function new_google_login_url(){

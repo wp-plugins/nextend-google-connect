@@ -1,6 +1,6 @@
 <?php
 /*
-Nextend Google Connect Settings Page
+Nextend Twitter Connect Settings Page
 */
 
 $newfb_status = "normal";
@@ -122,6 +122,31 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Google API key:', 'nextend-google-connect'); ?></th>
 		<td>
 		<input type="text" name="google_api_key" value="<?php echo $nextend_google_connect['google_api_key']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
+		<th scope="row"><?php _e('Load button stylesheet:', 'nextend-google-connect'); ?></th>
+		<td>
+    <?php if(!isset($nextend_google_connect['google_load_style'])) $nextend_google_connect['google_load_style'] = 1; ?>
+		<input name="google_load_style" id="google_load_style_yes" value="1" type="radio" <?php if(isset($nextend_google_connect['google_load_style']) && $nextend_google_connect['google_load_style']){?> checked <?php } ?>> Yes  &nbsp;&nbsp;&nbsp;&nbsp;
+    <input name="google_load_style" id="google_load_style_no" value="0" type="radio" <?php if(isset($nextend_google_connect['google_load_style']) && $nextend_google_connect['google_load_style'] == 0){?> checked <?php } ?>> No		
+		</td>
+		</tr>
+    
+    <tr>
+		<th scope="row"><?php _e('Login button:', 'nextend-google-connect'); ?></th>
+		<td>
+      <?php if(!isset($nextend_google_connect['google_login_button'])) $nextend_google_connect['google_login_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">CONNECT WITH</div></div></div>'; ?>
+		  <textarea cols="83" rows="3" name="google_login_button"><?php echo $nextend_google_connect['google_login_button']; ?></textarea>
+		</td>
+		</tr>
+    
+    <tr>
+		<th scope="row"><?php _e('Link account button:', 'nextend-google-connect'); ?></th>
+		<td>
+      <?php if(!isset($nextend_google_connect['google_link_button'])) $nextend_google_connect['google_link_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">LINK ACCOUNT TO</div></div></div>'; ?>
+		  <textarea cols="83" rows="3" name="google_link_button"><?php echo $nextend_google_connect['google_link_button']; ?></textarea>
 		</td>
 		</tr>
 	</table>
