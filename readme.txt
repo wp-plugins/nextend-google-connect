@@ -3,13 +3,17 @@ Contributors: nextendweb
 Tags: google, register, login, social connect, social, google connect
 Requires at least: 3.0
 Tested up to: 3.4
-Stable tag: 1.0
+Stable tag: 1.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 One click registration & login plugin for Google? Easy installation? Is it totally free and comes with support? Yeah!
 
 == Description ==
+
+Check the [DEMO](http://www.nextendweb.com/wp-login.php) on our site.
+
+Also we created a [Social Connect button generator](http://www.nextendweb.com/social-connect-button-generator) which work with this plugin fine. This allows you to create fancy login buttons. 
 
 Personally, I hate to fill out registration forms, waiting for confirmation e-mails, so we designed this plugin for our website. Now, we want to share this very usable plugin with everyone, for free!
  
@@ -39,5 +43,11 @@ Don’t forget to follow us on Facebook and Twitter!
 
 1.  Extract the zip file and just drop the contents in the wp-content/plugins/ directory of your WordPress installation and then activate the Plugin from Plugins page.
 2.  Follow the steps in the Nextend Google Connect settings page!
+
+
+== Screenshots ==
+
+1. Our Social Connect plugins on the main WP login page
+2. Our Social Connect plugins in the profile page for account linking
 
 == Changelog ==

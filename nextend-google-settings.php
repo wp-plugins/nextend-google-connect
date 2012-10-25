@@ -126,6 +126,14 @@ function NextendGoogle_Options_Page() {
 		</tr>
 
 		<tr>
+		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
+		<td>
+    <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Google - '; ?>
+		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
 		<th scope="row"><?php _e('Load button stylesheet:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_load_style'])) $nextend_google_connect['google_load_style'] = 1; ?>

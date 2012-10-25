@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.0
+Version: 1.1
 Author: Roland Soos
 License: GPL2
 */
@@ -127,12 +127,22 @@ function new_google_login(){
       $ID = $wpdb->get_var($wpdb->prepare('
         SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "'.$u['id'].'"
       '));
+      if(!get_user_by('id',$ID)){
+        $wpdb->query($wpdb->prepare('
+          DELETE FROM '.$wpdb->prefix.'social_users WHERE ID = "'.$ID.'"
+        '));
+        $ID = null;
+      }
       if(!is_user_logged_in()){
         if($ID == NULL){ // Register
           $ID = email_exists($email);
           if($ID == false){ // Real register
             $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
-            $ID = wp_create_user( 'Google - '.$u['name'], $random_password, $email );
+            $settings = maybe_unserialize(get_option('nextend_google_connect'));
+              
+            if(!isset($settings['google_user_prefix'])) $settings['google_user_prefix'] = 'Google - ';
+              
+            $ID = wp_create_user( $settings['google_user_prefix'].$u['name'], $random_password, $email );
           }
           $wpdb->insert( 
           	$wpdb->prefix.'social_users', 
@@ -150,6 +160,7 @@ function new_google_login(){
         }
         if($ID){ // Login
           wp_set_auth_cookie($ID, true, false);
+          do_action('wp_login', $settings['google_user_prefix'].$u['name']);
           header( 'Location: '.$_SESSION['redirect'] );
           unset($_SESSION['redirect']);
           exit;
@@ -251,7 +262,6 @@ function new_add_google_login_form(){
         socialLogins = $('<div class="newsociallogins" style="text-align: center;"><div style="clear:both;"></div></div>');
         loginForm.prepend("<h3 style='text-align:center;'>OR</h3>");
         loginForm.prepend(socialLogins);
-        console.log(socialLogins);
       }
       socialLogins.prepend('<?php echo addslashes(new_google_sign_button()); ?>');
     }(jQuery));
