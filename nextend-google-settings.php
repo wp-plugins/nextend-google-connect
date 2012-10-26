@@ -81,7 +81,7 @@ function NextendGoogle_Options_Page() {
   
   <li><a href="http://www.nextendweb.com/social-connect-plugins-for-wordpress.html" target="_blank"><?php _e('Check the realted <b>blog post</b>!', 'nextend-google-connect'); ?></a></li>
 	<li><br></li>
-	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/" target="_blank"><?php _e('Nextend Facebook Connect', 'nextend-google-connect'); ?></a></li>
+	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/" target="_blank"><?php _e('Nextend Google Connect', 'nextend-google-connect'); ?></a></li>
 	<li><br></li>
   <li><a href="http://profiles.wordpress.org/nextendweb" target="_blank"><?php _e('Nextend  plugins at WordPress.org', 'nextend-google-connect'); ?></a></li>
 	</ul></div>
