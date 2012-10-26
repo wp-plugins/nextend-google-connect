@@ -3,7 +3,7 @@ Contributors: nextendweb
 Tags: google, register, login, social connect, social, google connect
 Requires at least: 3.0
 Tested up to: 3.4
-Stable tag: 1.1
+Stable tag: 1.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,13 @@ Don’t forget to follow us on Facebook and Twitter!
 
 #### Usage
 
+After you activated the plugin, the plugin will autmatically 
+
+* add the login buttons to the WordPress login page. See screenshot #1
+* add the account linking buttons to the WordPress profile page. See screenshot #2
+
+
+#### Advanced usage
 
 **Simple link**
 

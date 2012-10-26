@@ -78,8 +78,12 @@ function NextendGoogle_Options_Page() {
 	<div id="newgoogle-about" class="postbox">
 	<h3 class="hndle"><?php _e('About this plugin', 'nextend-google-connect'); ?></h3>
 	<div class="inside"><ul>
-	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/"><?php _e('Plugin URI', 'nextend-google-connect'); ?></a></li>
-	<li><a href="http://profiles.wordpress.org/nextendweb" target="_blank"><?php _e('Author URI', 'nextend-google-connect'); ?></a></li>
+  
+  <li><a href="http://www.nextendweb.com/social-connect-plugins-for-wordpress.html" target="_blank"><?php _e('Check the realted <b>blog post</b>!', 'nextend-google-connect'); ?></a></li>
+	<li><br></li>
+	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/" target="_blank"><?php _e('Nextend Facebook Connect', 'nextend-google-connect'); ?></a></li>
+	<li><br></li>
+  <li><a href="http://profiles.wordpress.org/nextendweb" target="_blank"><?php _e('Nextend  plugins at WordPress.org', 'nextend-google-connect'); ?></a></li>
 	</ul></div>
 	</div>
 	<!--about end-->
@@ -156,6 +160,13 @@ function NextendGoogle_Options_Page() {
       <?php if(!isset($nextend_google_connect['google_link_button'])) $nextend_google_connect['google_link_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">LINK ACCOUNT TO</div></div></div>'; ?>
 		  <textarea cols="83" rows="3" name="google_link_button"><?php echo $nextend_google_connect['google_link_button']; ?></textarea>
 		</td>
+		</tr>
+    
+    <tr>
+		<th scope="row"></th>
+		<td>
+    <a href="http://www.nextendweb.com/social-connect-button-generator" target="_blank"><img style="margin-left: -4px;" src="<?php echo plugins_url('generatorbanner.png', __FILE__); ?>" /></a>
+    </td>
 		</tr>
 	</table>
 
