@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.2.2
+Version: 1.4.4
 Author: Roland Soos
 License: GPL2
 */
@@ -94,7 +94,7 @@ add_filter('init', 'new_google_add_query_var');
   Main function to handle the Sign in/Register/Linking process
 ----------------------------------------------------------------------------- */
 function new_google_login(){
-  global $wp, $wpdb;
+  global $wp, $wpdb, $new_google_settings;
   if($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle'])){
     include(dirname(__FILE__).'/sdk/init.php');
     if (isset($_GET['code'])) {
@@ -138,7 +138,7 @@ function new_google_login(){
           $ID = email_exists($email);
           if($ID == false){ // Real register
             $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
-            $settings = maybe_unserialize(get_option('nextend_google_connect'));
+            $settings = $new_google_settings;
               
             if(!isset($settings['google_user_prefix'])) $settings['google_user_prefix'] = 'Google - ';
               
@@ -197,6 +197,9 @@ function new_google_login(){
         }
       }
     } else {
+      if(isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto'){
+        $_GET['redirect'] = $new_google_settings['google_redirect'];
+      }
       $_SESSION['redirect'] = isset($_GET['redirect']) ? $_GET['redirect'] : site_url();
       header('LOCATION: '.$client->createAuthUrl());
       exit;
@@ -304,7 +307,7 @@ function new_google_plugin_action_links( $links, $file ) {
 ----------------------------------------------------------------------------- */
 function new_google_sign_button(){
   global $new_google_settings;
-  return '<a href="'.new_google_login_url().'">'.$new_google_settings['google_login_button'].'</a><br />';
+  return '<a href="'.new_google_login_url().(isset($_GET['redirect_to']) ? '&redirect='.$_GET['redirect_to'] : '').'" rel="nofollow">'.$new_google_settings['google_login_button'].'</a><br />';
 }
 
 function new_google_link_button(){

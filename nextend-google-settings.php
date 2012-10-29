@@ -138,6 +138,14 @@ function NextendGoogle_Options_Page() {
 		</tr>
 
 		<tr>
+		<th scope="row"><?php _e('Fixed redirect url:', 'nextend-google-connect'); ?></th>
+		<td>
+    <?php if(!isset($nextend_google_connect['google_redirect'])) $nextend_google_connect['google_redirect'] = 'auto'; ?>
+		<input type="text" name="google_redirect" value="<?php echo $nextend_google_connect['google_redirect']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
 		<th scope="row"><?php _e('Load button stylesheet:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_load_style'])) $nextend_google_connect['google_load_style'] = 1; ?>
