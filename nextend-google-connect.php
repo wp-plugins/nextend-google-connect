@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.7
+Version: 1.4.8
 Author: Roland Soos
 License: GPL2
 */
@@ -116,7 +116,6 @@ function new_google_login(){
     
     if ($client->getAccessToken()) {
       $u = $oauth2->userinfo->get();
-      
       // The access token may have been updated lazily.
       $_SESSION['token'] = $client->getAccessToken();
     
@@ -137,12 +136,20 @@ function new_google_login(){
         if($ID == NULL){ // Register
           $ID = email_exists($email);
           if($ID == false){ // Real register
+            require_once( ABSPATH . WPINC . '/registration.php');
             $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
             $settings = $new_google_settings;
               
             if(!isset($settings['google_user_prefix'])) $settings['google_user_prefix'] = 'Google - ';
               
             $ID = wp_create_user( $settings['google_user_prefix'].$u['name'], $random_password, $email );
+            wp_update_user(array(
+              'ID' => $ID, 
+              'display_name' => $u['name'], 
+              'first_name' => $u['given_name'], 
+              'last_name' => $u['family_name'], 
+              'googleplus' => $u['link']
+            ));
           }
           $wpdb->insert( 
           	$wpdb->prefix.'social_users', 
