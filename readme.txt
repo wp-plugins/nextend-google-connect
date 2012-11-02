@@ -4,7 +4,7 @@ Tags: google, register, login, social connect, social, google connect
 Donate link: https://www.facebook.com/nextendweb
 Requires at least: 3.0
 Tested up to: 3.4
-Stable tag: 1.4.9
+Stable tag: 1.4.10
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,9 +60,12 @@ After you activated the plugin, the plugin will autmatically
 
 == Changelog ==
 
+= 1.4.10 =
+* Added editProfileRedirect parameter for buddypress edit profile redirect. Usage: siteurl?editProfileRedirect=1
+
 = 1.4.9 =
 * https bugfix - author Michel Weimerskirch
-* 
+
 = 1.4.8 =
 * Added name, first name, last name and Google plus url support.
 * 

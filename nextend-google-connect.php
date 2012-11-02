@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.9
+Version: 1.4.10
 Author: Roland Soos
 License: GPL2
 */
@@ -86,6 +86,7 @@ register_activation_hook(__FILE__, 'new_google_connect_install');
 */
 function new_google_add_query_var(){
   global $wp;
+  $wp->add_query_var('editProfileRedirect');
   $wp->add_query_var('loginGoogle');
 }
 add_filter('init', 'new_google_add_query_var');
@@ -325,6 +326,19 @@ function new_google_link_button(){
 function new_google_login_url(){
   return site_url('index.php').'?loginGoogle=1';
 }
+
+function new_google_edit_profile_redirect(){
+  global $wp;
+  if(isset($wp->query_vars['editProfileRedirect']) ){
+    if(function_exists('bp_loggedin_user_domain')){
+      header('LOCATION: '.bp_loggedin_user_domain().'profile/edit/group/1/');
+    }else{
+      header('LOCATION: '.self_admin_url( 'profile.php' ));
+    }
+    exit;
+  }
+}
+add_action('parse_request', new_google_edit_profile_redirect);
 
 /*
   Session notices used in the profile settings
