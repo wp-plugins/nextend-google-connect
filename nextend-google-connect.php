@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.10
+Version: 1.4.11
 Author: Roland Soos
 License: GPL2
 */
