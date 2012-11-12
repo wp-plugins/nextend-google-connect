@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.14
+Version: 1.4.15
 Author: Roland Soos
 License: GPL2
 */
@@ -139,11 +139,10 @@ function new_google_login(){
           if($ID == false){ // Real register
             require_once( ABSPATH . WPINC . '/registration.php');
             $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
-            $settings = $new_google_settings;
               
-            if(!isset($settings['google_user_prefix'])) $settings['google_user_prefix'] = 'Google - ';
+            if(!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
               
-            $ID = wp_create_user( $settings['google_user_prefix'].$u['name'], $random_password, $email );
+            $ID = wp_create_user( $new_google_settings['google_user_prefix'].$u['name'], $random_password, $email );
             wp_update_user(array(
               'ID' => $ID, 
               'display_name' => $u['name'], 
@@ -165,6 +164,9 @@ function new_google_login(){
               '%s'
           	)
           );
+          if(isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto'){
+            $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
+          }
         }
         if($ID){ // Login
           wp_set_auth_cookie($ID, true, false);

@@ -141,7 +141,15 @@ function NextendGoogle_Options_Page() {
 		</tr>
 
 		<tr>
-		<th scope="row"><?php _e('Fixed redirect url:', 'nextend-google-connect'); ?></th>
+		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
+		<td>
+    <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Facebook - '; ?>
+		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
+		<th scope="row"><?php _e('Fixed redirect url for login:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_redirect'])) $nextend_google_connect['google_redirect'] = 'auto'; ?>
 		<input type="text" name="google_redirect" value="<?php echo $nextend_google_connect['google_redirect']; ?>" />
