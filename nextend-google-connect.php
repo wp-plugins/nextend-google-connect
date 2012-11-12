@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.13
+Version: 1.4.14
 Author: Roland Soos
 License: GPL2
 */
@@ -340,6 +340,12 @@ function new_google_edit_profile_redirect(){
   }
 }
 add_action('parse_request', new_google_edit_profile_redirect);
+
+function new_google_jquery(){
+  wp_enqueue_script( 'jquery' );
+}
+
+add_action('login_form_login', 'new_google_jquery');
 
 /*
   Session notices used in the profile settings
