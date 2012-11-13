@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.16
+Version: 1.4.17
 Author: Roland Soos
 License: GPL2
 */
@@ -324,7 +324,7 @@ function new_google_sign_button(){
 
 function new_google_link_button(){
   global $new_google_settings;
-  return '<a href="'.new_fb_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"].'">'.$new_google_settings['google_link_button'].'</a><br />';
+  return '<a href="'.new_google_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"].'">'.$new_google_settings['google_link_button'].'</a><br />';
 }
 
 function new_google_login_url(){
