@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.15
+Version: 1.4.16
 Author: Roland Soos
 License: GPL2
 */
@@ -272,7 +272,7 @@ function new_add_google_login_form(){
     (function($) {
       if(!has_social_form){
         has_social_form = true;
-        var loginForm = $('#loginform');
+        var loginForm = $.merge($('#loginform'),$('#registerform'));
         socialLogins = $('<div class="newsociallogins" style="text-align: center;"><div style="clear:both;"></div></div>');
         loginForm.prepend("<h3 style='text-align:center;'>OR</h3>");
         loginForm.prepend(socialLogins);
@@ -285,6 +285,7 @@ function new_add_google_login_form(){
 }
 
 add_action('login_form', 'new_add_google_login_form');
+add_action('register_form', 'new_add_google_login_form');
 
 /* 
   Options Page 
@@ -348,6 +349,7 @@ function new_google_jquery(){
 }
 
 add_action('login_form_login', 'new_google_jquery');
+add_action('login_form_register', 'new_google_jquery');
 
 /*
   Session notices used in the profile settings
