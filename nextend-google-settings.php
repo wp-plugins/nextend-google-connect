@@ -157,6 +157,14 @@ function NextendGoogle_Options_Page() {
 		</tr>
 
 		<tr>
+		<th scope="row"><?php _e('Fixed redirect url for register:', 'nextend-google-connect'); ?></th>
+		<td>
+    <?php if(!isset($nextend_google_connect['google_redirect_reg'])) $nextend_google_connect['google_redirect_reg'] = 'auto'; ?>
+		<input type="text" name="google_redirect_reg" value="<?php echo $nextend_google_connect['google_redirect_reg']; ?>" />
+		</td>
+		</tr>
+
+		<tr>
 		<th scope="row"><?php _e('Load button stylesheet:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_load_style'])) $nextend_google_connect['google_load_style'] = 1; ?>

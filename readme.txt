@@ -60,6 +60,9 @@ After you activated the plugin, the plugin will autmatically
 
 == Changelog ==
 
+= 1.4.18 =
+* Register redirect bugfix
+
 = 1.4.17 =
 * Bugfix
 
