@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.18
+Version: 1.4.21
 Author: Roland Soos
 License: GPL2
 */
@@ -125,8 +125,8 @@ function new_google_login(){
       $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
       
       $ID = $wpdb->get_var($wpdb->prepare('
-        SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "'.$u['id'].'"
-      '));
+        SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "%d"
+      ', $u['id']));
       if(!get_user_by('id',$ID)){
         $wpdb->query($wpdb->prepare('
           DELETE FROM '.$wpdb->prefix.'social_users WHERE ID = "'.$ID.'"
@@ -227,8 +227,8 @@ function new_google_is_user_connected(){
   global $wpdb;
   $current_user = wp_get_current_user();
   $ID = $wpdb->get_var($wpdb->prepare('
-    SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "'.$current_user->ID.'"
-  '));
+    SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "%d"
+  '), $current_user->ID);
   if($ID === NULL) return false;
   return true;
 }
