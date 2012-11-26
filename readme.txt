@@ -4,7 +4,7 @@ Tags: google, register, login, social connect, social, google connect
 Donate link: https://www.facebook.com/nextendweb
 Requires at least: 3.0
 Tested up to: 3.4
-Stable tag: 1.4.24
+Stable tag: 1.4.25
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -59,6 +59,9 @@ After you activated the plugin, the plugin will autmatically
 2. Our Social Connect plugins in the profile page for account linking
 
 == Changelog ==
+
+= 1.4.25 =
+* wp_login do_action fix
 
 = 1.4.24 =
 * new_google_is_user_connected() function now returns with the Google id if authenticated, null if not...
