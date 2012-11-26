@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.23
+Version: 1.4.24
 Author: Roland Soos
 License: GPL2
 */
@@ -143,27 +143,31 @@ function new_google_login(){
             if(!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
               
             $ID = wp_create_user( $new_google_settings['google_user_prefix'].$u['name'], $random_password, $email );
-            wp_update_user(array(
-              'ID' => $ID, 
-              'display_name' => $u['name'], 
-              'first_name' => $u['given_name'], 
-              'last_name' => $u['family_name'], 
-              'googleplus' => $u['link']
-            ));
+            if($ID){
+              wp_update_user(array(
+                'ID' => $ID, 
+                'display_name' => $u['name'], 
+                'first_name' => $u['given_name'], 
+                'last_name' => $u['family_name'], 
+                'googleplus' => $u['link']
+              ));
+            }
           }
-          $wpdb->insert( 
-          	$wpdb->prefix.'social_users', 
-          	array( 
-          		'ID' => $ID, 
-          		'type' => 'google',
-              'identifier' => $u['id']
-          	), 
-          	array( 
-          		'%d', 
-          		'%s',
-              '%s'
-          	)
-          );
+          if($ID){
+            $wpdb->insert( 
+            	$wpdb->prefix.'social_users', 
+            	array( 
+            		'ID' => $ID, 
+            		'type' => 'google',
+                'identifier' => $u['id']
+            	), 
+            	array( 
+            		'%d', 
+            		'%s',
+                '%s'
+            	)
+            );
+          }
           if(isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto'){
             $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
           }
@@ -227,10 +231,10 @@ function new_google_is_user_connected(){
   global $wpdb;
   $current_user = wp_get_current_user();
   $ID = $wpdb->get_var($wpdb->prepare('
-    SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "%d"
+    SELECT identifier FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "%d"
   '), $current_user->ID);
   if($ID === NULL) return false;
-  return true;
+  return $ID;
 }
 
 /*
