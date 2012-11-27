@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.25
+Version: 1.4.26
 Author: Roland Soos
 License: GPL2
 */
@@ -144,6 +144,7 @@ function new_google_login(){
               
             $ID = wp_create_user( $new_google_settings['google_user_prefix'].$u['name'], $random_password, $email );
             if($ID){
+              wp_new_user_notification($ID, $random_password);
               wp_update_user(array(
                 'ID' => $ID, 
                 'display_name' => $u['name'], 
@@ -151,6 +152,7 @@ function new_google_login(){
                 'last_name' => $u['family_name'], 
                 'googleplus' => $u['link']
               ));
+              update_user_meta( $ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/'.$u['id']);
             }
           }
           if($ID){
@@ -290,6 +292,25 @@ function new_add_google_login_form(){
 
 add_action('login_form', 'new_add_google_login_form');
 add_action('register_form', 'new_add_google_login_form');
+
+add_filter( 'get_avatar', 'new_google_insert_avatar', 1, 5 );
+function new_google_insert_avatar( $avatar = '', $id_or_email, $size = 96, $default = '', $alt = false ) {
+  $id = 0;	
+  if(is_numeric($id_or_email)){
+    $id = $id_or_email;
+  }else if(is_string($id_or_email)){
+    $u = get_user_by('email',$id_or_email);
+    $id = $u->id;
+  }else if(is_object($id_or_email)){
+    $id = $id_or_email->user_id;
+  }
+  if($id == 0) return $avatar;
+
+  $pic = get_user_meta($id, 'google_profile_picture', true);
+  if(!$pic || $pic == '') return $avatar;
+  $avatar = preg_replace('/src=("|\').*?("|\')/i', 'src="'.$pic.'"', $avatar);
+  return $avatar;
+}
 
 /* 
   Options Page 
