@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.26
+Version: 1.4.27
 Author: Roland Soos
 License: GPL2
 */
@@ -141,9 +141,19 @@ function new_google_login(){
             $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
               
             if(!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
+            $sanitized_user_login = sanitize_user($new_google_settings['google_user_prefix'].$u['name']);
+            if(!validate_username($sanitized_user_login)){
+              $sanitized_user_login = sanitize_user('google'.$user_profile['id']);
+            }
+            $defaul_user_name = $sanitized_user_login;
+            $i = 1;
+            while(username_exists($sanitized_user_login)){
+              $sanitized_user_login = $defaul_user_name.$i;
+              $i++;
+            }
               
-            $ID = wp_create_user( $new_google_settings['google_user_prefix'].$u['name'], $random_password, $email );
-            if($ID){
+            $ID = wp_create_user( $sanitized_user_login, $random_password, $email );
+            if(!is_wp_error($ID)){
               wp_new_user_notification($ID, $random_password);
               wp_update_user(array(
                 'ID' => $ID, 
@@ -153,6 +163,8 @@ function new_google_login(){
                 'googleplus' => $u['link']
               ));
               update_user_meta( $ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/'.$u['id']);
+            }else{
+              return;
             }
           }
           if($ID){
