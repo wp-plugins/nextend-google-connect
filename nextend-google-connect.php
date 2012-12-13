@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.27
+Version: 1.4.31
 Author: Roland Soos
 License: GPL2
 */
@@ -94,117 +94,104 @@ add_filter('init', 'new_google_add_query_var');
 /* -----------------------------------------------------------------------------
   Main function to handle the Sign in/Register/Linking process
 ----------------------------------------------------------------------------- */
+
+/*
+  Compatibility for older versions
+*/
+add_action('parse_request', new_google_login_compat);
+function new_google_login_compat(){
+  global $wp;
+  if($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle']) ){
+    new_google_login_action();
+  }
+}
+
+/*
+  For login page
+*/
+add_action('login_init', new_google_login);
 function new_google_login(){
+  if($_REQUEST['loginGoogle'] == '1'){
+    new_google_login_action();
+  }
+}
+
+function new_google_login_action(){
   global $wp, $wpdb, $new_google_settings;
-  if($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle'])){
-    include(dirname(__FILE__).'/sdk/init.php');
-    if (isset($_GET['code'])) {
-      $client->authenticate();
-      $_SESSION['token'] = $client->getAccessToken();
-      $redirect = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];
-      header('Location: ' . filter_var(new_google_login_url(), FILTER_SANITIZE_URL));
-      exit;
+  include(dirname(__FILE__).'/sdk/init.php');
+  if (isset($_GET['code'])) {
+    $client->authenticate();
+    $_SESSION['token'] = $client->getAccessToken();
+    header('Location: ' . filter_var(new_google_login_url(), FILTER_SANITIZE_URL));
+    exit;
+  }
+  
+  if (isset($_SESSION['token'])) {
+   $client->setAccessToken($_SESSION['token']);
+  }
+  
+  if (isset($_REQUEST['logout'])) {
+    unset($_SESSION['token']);
+    $client->revokeToken();
+  }
+  
+  if ($client->getAccessToken()) {
+    $u = $oauth2->userinfo->get();
+    // The access token may have been updated lazily.
+    $_SESSION['token'] = $client->getAccessToken();
+  
+    // These fields are currently filtered through the PHP sanitize filters.
+    // See http://www.php.net/manual/en/filter.filters.sanitize.php
+    $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
+    
+    $ID = $wpdb->get_var($wpdb->prepare('
+      SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "%d"
+    ', $u['id']));
+    if(!get_user_by('id',$ID)){
+      $wpdb->query($wpdb->prepare('
+        DELETE FROM '.$wpdb->prefix.'social_users WHERE ID = "%d"
+      ',$ID));
+      $ID = null;
     }
-    
-    if (isset($_SESSION['token'])) {
-     $client->setAccessToken($_SESSION['token']);
-    }
-    
-    if (isset($_REQUEST['logout'])) {
-      unset($_SESSION['token']);
-      $client->revokeToken();
-    }
-    
-    if ($client->getAccessToken()) {
-      $u = $oauth2->userinfo->get();
-      // The access token may have been updated lazily.
-      $_SESSION['token'] = $client->getAccessToken();
-    
-      // These fields are currently filtered through the PHP sanitize filters.
-      // See http://www.php.net/manual/en/filter.filters.sanitize.php
-      $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
-      
-      $ID = $wpdb->get_var($wpdb->prepare('
-        SELECT ID FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND identifier = "%d"
-      ', $u['id']));
-      if(!get_user_by('id',$ID)){
-        $wpdb->query($wpdb->prepare('
-          DELETE FROM '.$wpdb->prefix.'social_users WHERE ID = "%d"
-        ',$ID));
-        $ID = null;
-      }
-      if(!is_user_logged_in()){
-        if($ID == NULL){ // Register
-          $ID = email_exists($email);
-          if($ID == false){ // Real register
-            require_once( ABSPATH . WPINC . '/registration.php');
-            $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
-              
-            if(!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
-            $sanitized_user_login = sanitize_user($new_google_settings['google_user_prefix'].$u['name']);
-            if(!validate_username($sanitized_user_login)){
-              $sanitized_user_login = sanitize_user('google'.$user_profile['id']);
-            }
-            $defaul_user_name = $sanitized_user_login;
-            $i = 1;
-            while(username_exists($sanitized_user_login)){
-              $sanitized_user_login = $defaul_user_name.$i;
-              $i++;
-            }
-              
-            $ID = wp_create_user( $sanitized_user_login, $random_password, $email );
-            if(!is_wp_error($ID)){
-              wp_new_user_notification($ID, $random_password);
-              wp_update_user(array(
-                'ID' => $ID, 
-                'display_name' => $u['name'], 
-                'first_name' => $u['given_name'], 
-                'last_name' => $u['family_name'], 
-                'googleplus' => $u['link']
-              ));
-              update_user_meta( $ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/'.$u['id']);
-            }else{
-              return;
-            }
+    if(!is_user_logged_in()){
+      if($ID == NULL){ // Register
+        $ID = email_exists($email);
+        if($ID == false){ // Real register
+          require_once( ABSPATH . WPINC . '/registration.php');
+          $random_password = wp_generate_password( $length=12, $include_standard_special_chars=false );
+            
+          if(!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
+          $sanitized_user_login = sanitize_user($new_google_settings['google_user_prefix'].$u['name']);
+          if(!validate_username($sanitized_user_login)){
+            $sanitized_user_login = sanitize_user('google'.$user_profile['id']);
           }
-          if($ID){
-            $wpdb->insert( 
-            	$wpdb->prefix.'social_users', 
-            	array( 
-            		'ID' => $ID, 
-            		'type' => 'google',
-                'identifier' => $u['id']
-            	), 
-            	array( 
-            		'%d', 
-            		'%s',
-                '%s'
-            	)
-            );
+          $defaul_user_name = $sanitized_user_login;
+          $i = 1;
+          while(username_exists($sanitized_user_login)){
+            $sanitized_user_login = $defaul_user_name.$i;
+            $i++;
           }
-          if(isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto'){
-            $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
+            
+          $ID = wp_create_user( $sanitized_user_login, $random_password, $email );
+          if(!is_wp_error($ID)){
+            wp_new_user_notification($ID, $random_password);
+            wp_update_user(array(
+              'ID' => $ID, 
+              'display_name' => $u['name'], 
+              'first_name' => $u['given_name'], 
+              'last_name' => $u['family_name'], 
+              'googleplus' => $u['link']
+            ));
+            update_user_meta( $ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/'.$u['id']);
+          }else{
+            return;
           }
         }
-        if($ID){ // Login
-          wp_set_auth_cookie($ID, true, false);
-          $user_info = get_userdata($ID);
-          do_action('wp_login', $user_info->user_login, $user_info);
-          header( 'Location: '.$_SESSION['redirect'] );
-          unset($_SESSION['redirect']);
-          exit;
-        }
-      }else{
-        $current_user = wp_get_current_user();
-        if($current_user->ID == $ID){ // It was a simple login
-          header( 'Location: '.$_SESSION['redirect'] );
-          unset($_SESSION['redirect']);
-          exit;
-        }elseif($ID === NULL){  // Let's connect the accout to the current user!
+        if($ID){
           $wpdb->insert( 
           	$wpdb->prefix.'social_users', 
           	array( 
-          		'ID' => $current_user->ID, 
+          		'ID' => $ID, 
           		'type' => 'google',
               'identifier' => $u['id']
           	), 
@@ -212,31 +199,66 @@ function new_google_login(){
           		'%d', 
           		'%s',
               '%s'
-          	) 
+          	)
           );
-          $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
-          header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
-          unset($_SESSION['redirect']);
-          exit;
-        }else{
-          $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
-          header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
-          unset($_SESSION['redirect']);
-          exit;
+        }
+        if(isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto'){
+          $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
         }
       }
-    } else {
-      if(isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto'){
-        $_GET['redirect'] = $new_google_settings['google_redirect'];
+      if($ID){ // Login
+        $secure_cookie = is_ssl();
+        $secure_cookie = apply_filters('secure_signon_cookie', $secure_cookie, array());
+        global $auth_secure_cookie; // XXX ugly hack to pass this to wp_authenticate_cookie
+        $auth_secure_cookie = $secure_cookie;
+        
+        wp_set_auth_cookie($ID, true, $secure_cookie);
+        $user_info = get_userdata($ID);
+        do_action('wp_login', $user_info->user_login, $user_info);
+        header( 'Location: '.$_SESSION['redirect'] );
+        unset($_SESSION['redirect']);
+        exit;
       }
-      $_SESSION['redirect'] = isset($_GET['redirect']) ? $_GET['redirect'] : site_url();
-      header('LOCATION: '.$client->createAuthUrl());
-      exit;
+    }else{
+      $current_user = wp_get_current_user();
+      if($current_user->ID == $ID){ // It was a simple login
+        header( 'Location: '.$_SESSION['redirect'] );
+        unset($_SESSION['redirect']);
+        exit;
+      }elseif($ID === NULL){  // Let's connect the account to the current user!
+        $wpdb->insert( 
+        	$wpdb->prefix.'social_users', 
+        	array( 
+        		'ID' => $current_user->ID, 
+        		'type' => 'google',
+            'identifier' => $u['id']
+        	), 
+        	array( 
+        		'%d', 
+        		'%s',
+            '%s'
+        	) 
+        );
+        $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
+        header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
+        unset($_SESSION['redirect']);
+        exit;
+      }else{
+        $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
+        header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
+        unset($_SESSION['redirect']);
+        exit;
+      }
     }
+  } else {
+    if(isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto'){
+      $_GET['redirect'] = $new_google_settings['google_redirect'];
+    }
+    $_SESSION['redirect'] = isset($_GET['redirect']) ? $_GET['redirect'] : site_url();
+    header('LOCATION: '.$client->createAuthUrl());
     exit;
   }
 }
-add_action('parse_request', new_google_login);
 
 /*
   Is the current user connected the Google profile? 
@@ -246,7 +268,7 @@ function new_google_is_user_connected(){
   $current_user = wp_get_current_user();
   $ID = $wpdb->get_var($wpdb->prepare('
     SELECT identifier FROM '.$wpdb->prefix.'social_users WHERE type = "google" AND ID = "%d"
-  '), $current_user->ID);
+  ', $current_user->ID));
   if($ID === NULL) return false;
   return $ID;
 }
@@ -256,6 +278,8 @@ function new_google_is_user_connected(){
 */
 function new_add_google_connect_field() {
   global $new_is_social_header;
+  if(new_google_is_user_connected()) return;
+  
   if($new_is_social_header === NULL){
     ?>
     <h3>Social connect</h3>
@@ -268,9 +292,7 @@ function new_add_google_connect_field() {
       <tr>	
         <th></th>	
         <td>
-          <?php if(!new_google_is_user_connected()): ?>
-            <?php echo new_google_link_button() ?>
-          <?php endif; ?>
+          <?php echo new_google_link_button() ?>
         </td>
       </tr>
     </tbody>
@@ -365,7 +387,7 @@ function new_google_link_button(){
 }
 
 function new_google_login_url(){
-  return site_url('index.php').'?loginGoogle=1';
+  return site_url('wp_login.php').'?loginGoogle=1';
 }
 
 function new_google_edit_profile_redirect(){

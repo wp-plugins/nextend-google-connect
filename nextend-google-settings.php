@@ -62,10 +62,10 @@ function NextendGoogle_Options_Page() {
   </p>
   <h3><?php _e('Usage', 'nextend-google-connect'); ?></h3>
   <h4><?php _e('Simple link', 'nextend-google-connect'); ?></h4>
-	<p><?php _e('&lt;a href="'.get_option('siteurl').'?loginGoogle=1&redirect='.get_option('siteurl').'" onclick="window.location = \''.get_option('siteurl').'?loginGoogle=1&redirect=\'+window.location.href; return false;"&gt;Click here to login or register with google&lt;/a&gt;', 'nextend-google-connect'); ?></p>
+	<p><?php _e('&lt;a href="'.new_google_login_url().'&redirect='.get_option('siteurl').'" onclick="window.location = \''.new_google_login_url().'&redirect=\'+window.location.href; return false;"&gt;Click here to login or register with google&lt;/a&gt;', 'nextend-google-connect'); ?></p>
 	
   <h4><?php _e('Image button', 'nextend-google-connect'); ?></h4>
-	<p><?php _e('&lt;a href="'.get_option('siteurl').'?loginGoogle=1&redirect='.get_option('siteurl').'" onclick="window.location = \''.get_option('siteurl').'?loginGoogle=1&redirect=\'+window.location.href; return false;"&gt; &lt;img src="HereComeTheImage" /&gt; &lt;/a&gt;', 'nextend-google-connect'); ?></p>
+	<p><?php _e('&lt;a href="'.new_google_login_url().'&redirect='.get_option('siteurl').'" onclick="window.location = \''.new_google_login_url().'&redirect=\'+window.location.href; return false;"&gt; &lt;img src="HereComeTheImage" /&gt; &lt;/a&gt;', 'nextend-google-connect'); ?></p>
   
   <h3><?php _e('Note', 'nextend-google-connect'); ?></h3>
   <p><?php _e('If the google user\'s email address already used by another member of your site, the google profile will be automatically linked to the existing profile!', 'nextend-google-connect'); ?></p>
