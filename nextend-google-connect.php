@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.33
+Version: 1.4.36
 Author: Roland Soos
 License: GPL2
 */
@@ -98,7 +98,7 @@ add_filter('init', 'new_google_add_query_var');
 /*
   Compatibility for older versions
 */
-add_action('parse_request', new_google_login_compat);
+add_action('parse_request', 'new_google_login_compat');
 function new_google_login_compat(){
   global $wp;
   if($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle']) ){
@@ -109,7 +109,7 @@ function new_google_login_compat(){
 /*
   For login page
 */
-add_action('login_init', new_google_login);
+add_action('login_init', 'new_google_login');
 function new_google_login(){
   if($_REQUEST['loginGoogle'] == '1'){
     new_google_login_action();
@@ -386,7 +386,7 @@ function new_google_sign_button(){
 
 function new_google_link_button(){
   global $new_google_settings;
-  return '<a href="'.new_google_login_url().'&redirect='.site_url().$_SERVER["REQUEST_URI"].'">'.$new_google_settings['google_link_button'].'</a><br />';
+  return '<a href="'.new_google_login_url().'&redirect='.site_url().$GLOBALS['HTTP_SERVER_VARS']['REQUEST_URI'].'">'.$new_google_settings['google_link_button'].'</a><br />';
 }
 
 function new_google_login_url(){
@@ -404,7 +404,7 @@ function new_google_edit_profile_redirect(){
     exit;
   }
 }
-add_action('parse_request', new_google_edit_profile_redirect);
+add_action('parse_request', 'new_google_edit_profile_redirect');
 
 function new_google_jquery(){
   wp_enqueue_script( 'jquery' );
