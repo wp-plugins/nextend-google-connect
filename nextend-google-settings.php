@@ -190,6 +190,14 @@ function NextendGoogle_Options_Page() {
 		</tr>
     
     <tr>
+		<th scope="row"><?php _e('Unlink account button:', 'nextend-google-connect'); ?></th>
+		<td>
+      <?php if(!isset($nextend_google_connect['google_unlink_button'])) $nextend_google_connect['google_unlink_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">UNLINK ACCOUNT</div></div></div>'; ?>
+		  <textarea cols="83" rows="3" name="google_unlink_button"><?php echo $nextend_google_connect['google_unlink_button']; ?></textarea>
+		</td>
+		</tr>
+    
+    <tr>
 		<th scope="row"></th>
 		<td>
     <a href="http://www.nextendweb.com/social-connect-button-generator" target="_blank"><img style="margin-left: -4px;" src="<?php echo plugins_url('generatorbanner.png', __FILE__); ?>" /></a>

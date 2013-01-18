@@ -3,7 +3,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.42
+Version: 1.4.45
 Author: Roland Soos
 License: GPL2
 */
@@ -34,8 +34,11 @@ $new_google_settings = maybe_unserialize(get_option('nextend_google_connect'));
   Sessions required for the profile notices 
 */
 function new_google_start_session() {
-  if(!session_id())
-    session_start();
+  if(!headers_sent()){
+    if(!session_id()){
+      session_start();
+    }
+  }
 }
 
 function new_google_end_session() {
@@ -175,6 +178,7 @@ function new_google_login_action(){
           $ID = wp_create_user( $sanitized_user_login, $random_password, $email );
           if(!is_wp_error($ID)){
             wp_new_user_notification($ID, $random_password);
+            $user_info = get_userdata($ID);
             wp_update_user(array(
               'ID' => $ID, 
               'display_name' => $u['name'], 
@@ -182,7 +186,9 @@ function new_google_login_action(){
               'last_name' => $u['family_name'], 
               'googleplus' => $u['link']
             ));
+            update_user_meta( $ID, 'new_google_default_password', $user_info->user_pass);
             update_user_meta( $ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/'.$u['id']);
+            do_action('nextend_google_user_registered', $u, $oauth2);
           }else{
             return;
           }
@@ -206,6 +212,8 @@ function new_google_login_action(){
           $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
         }
       }
+      if($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url())
+        $_SESSION['redirect'] = site_url();
       if($ID){ // Login
         $secure_cookie = is_ssl();
         $secure_cookie = apply_filters('secure_signon_cookie', $secure_cookie, array());
@@ -215,17 +223,48 @@ function new_google_login_action(){
         wp_set_auth_cookie($ID, true, $secure_cookie);
         $user_info = get_userdata($ID);
         do_action('wp_login', $user_info->user_login, $user_info);
+        do_action('nextend_google_user_logged_in', $u, $oauth2);
         header( 'Location: '.$_SESSION['redirect'] );
         unset($_SESSION['redirect']);
         exit;
       }
     }else{
-      $current_user = wp_get_current_user();
-      if($current_user->ID == $ID){ // It was a simple login
+      if($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url())
+        $_SESSION['redirect'] = site_url();
+      if(new_google_is_user_connected()){ // It was a simple login
+        if($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()){
+          if(isset($_GET['redirect']) ){
+            $_SESSION['redirect'] = $_GET['redirect'];
+          }else{
+            $_SESSION['redirect'] = site_url();
+          }
+        }
+          
+        if(isset($_GET['action']) && $_GET['action'] == 'unlink'){
+          $user_info = wp_get_current_user();
+          if(get_user_meta( $user_info->ID, 'new_google_default_password', true) == $user_info->user_pass){
+            // Unlinking not available
+            $_SESSION['new_google_admin_notice'] = __('Your account using the default password, which generated with social register. Please change it and try again!', 'nextend-facebook-connect');
+            header( 'Location: '.$_SESSION['redirect'] );
+            unset($_SESSION['redirect']);
+            exit;
+          }else{
+            $wpdb->query(
+              $wpdb->prepare( 
+              	'DELETE FROM '.$wpdb->prefix.'social_users
+                WHERE ID = %d
+                AND type = \'google\'', $user_info->ID));
+            header( 'Location: '.$_SESSION['redirect'] );
+            unset($_SESSION['redirect']);
+            exit;        
+          }
+          exit;
+        }
         header( 'Location: '.$_SESSION['redirect'] );
         unset($_SESSION['redirect']);
         exit;
       }elseif($ID === NULL){  // Let's connect the account to the current user!
+        $current_user = wp_get_current_user();
         $wpdb->insert( 
         	$wpdb->prefix.'social_users', 
         	array( 
@@ -239,6 +278,7 @@ function new_google_login_action(){
             '%s'
         	) 
         );
+        do_action('nextend_google_user_account_linked', $u, $oauth2);
         $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
         header( 'Location: '.(isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']) );
         unset($_SESSION['redirect']);
@@ -278,7 +318,6 @@ function new_google_is_user_connected(){
 */
 function new_add_google_connect_field() {
   global $new_is_social_header;
-  if(new_google_is_user_connected()) return;
   
   if($new_is_social_header === NULL){
     ?>
@@ -292,7 +331,13 @@ function new_add_google_connect_field() {
       <tr>	
         <th></th>	
         <td>
-          <?php echo new_google_link_button() ?>
+          <?php 
+            if(new_google_is_user_connected()){
+              echo new_google_unlink_button();
+            }else{
+              echo new_google_link_button();
+            }
+          ?>
         </td>
       </tr>
     </tbody>
@@ -388,7 +433,24 @@ function new_google_sign_button(){
 
 function new_google_link_button(){
   global $new_google_settings;
-  return '<a href="'.new_google_login_url().'&redirect='.site_url().$GLOBALS['HTTP_SERVER_VARS']['REQUEST_URI'].'">'.$new_google_settings['google_link_button'].'</a><br />';
+  return '<a href="'.new_google_login_url().'&redirect='.new_google_curPageURL().'">'.$new_google_settings['google_link_button'].'</a><br />';
+}
+
+function new_google_unlink_button(){
+  global $new_google_settings;
+  return '<a href="'.new_google_login_url().'&action=unlink&redirect='.new_google_curPageURL().'">'.$new_google_settings['google_unlink_button'].'</a><br />';
+}
+
+function new_google_curPageURL() {
+  $pageURL = 'http';
+  if (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") {$pageURL .= "s";}
+  $pageURL .= "://";
+  if ($_SERVER["SERVER_PORT"] != "80") {
+    $pageURL .= $_SERVER["SERVER_NAME"].":".$_SERVER["SERVER_PORT"].$_SERVER["REQUEST_URI"];
+  } else {
+    $pageURL .= $_SERVER["SERVER_NAME"].$_SERVER["REQUEST_URI"];
+  }
+  return $pageURL;
 }
 
 function new_google_login_url(){
