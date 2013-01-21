@@ -1,232 +1,485 @@
 <?php
+
 /*
-Nextend Twitter Connect Settings Page
+Plugin Name: Nextend Google Connect
+Plugin URI: http://nextendweb.com/
+Description: Google connect
+Version: 1.4.47
+Author: Roland Soos
+License: GPL2
 */
 
-$newfb_status = "normal";
+/*  Copyright 2012  Roland Soos - Nextend  (email : roland@nextendweb.com)
 
-if(isset($_POST['newgoogle_update_options'])) {
-	if($_POST['newgoogle_update_options'] == 'Y') {
-    foreach($_POST AS $k => $v){
-      $_POST[$k] = stripslashes($v);
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2, as
+published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+define('NEW_GOOGLE_LOGIN', 1);
+if (!defined('NEW_GOOGLE_LOGIN_PLUGIN_BASENAME')) define('NEW_GOOGLE_LOGIN_PLUGIN_BASENAME', plugin_basename(__FILE__));
+$new_google_settings = maybe_unserialize(get_option('nextend_google_connect'));
+
+/*
+Sessions required for the profile notices
+*/
+
+function new_google_start_session() {
+
+  if (!headers_sent()) {
+    if (!session_id()) {
+      session_start();
     }
-		update_option("nextend_google_connect", maybe_serialize($_POST));
-		$newgoogle_status = 'update_success';
+  }
+}
+
+function new_google_end_session() {
+
+  if (session_id()) session_destroy();
+}
+add_action('init', 'new_google_start_session', 1);
+add_action('wp_logout', 'new_google_end_session');
+add_action('wp_login', 'new_google_end_session');
+
+/*
+Loading style for buttons
+*/
+
+function nextend_google_connect_stylesheet() {
+
+  wp_register_style('nextend_google_connect_stylesheet', plugins_url('buttons/google-btn.css', __FILE__));
+  wp_enqueue_style('nextend_google_connect_stylesheet');
+}
+if ($new_google_settings['google_load_style']) {
+  add_action('wp_enqueue_scripts', 'nextend_google_connect_stylesheet');
+  add_action('login_enqueue_scripts', 'nextend_google_connect_stylesheet');
+  add_action('admin_enqueue_scripts', 'nextend_google_connect_stylesheet');
+}
+
+/*
+Creating the required table on installation
+*/
+
+function new_google_connect_install() {
+
+  global $wpdb;
+  $table_name = $wpdb->prefix . "social_users";
+  $sql = "CREATE TABLE $table_name (
+    `ID` int(11) NOT NULL,
+    `type` varchar(20) NOT NULL,
+    `identifier` varchar(100) NOT NULL,
+    KEY `ID` (`ID`,`type`)
+  );";
+  require_once (ABSPATH . 'wp-admin/includes/upgrade.php');
+  dbDelta($sql);
+}
+register_activation_hook(__FILE__, 'new_google_connect_install');
+
+/*
+Adding query vars for the WP parser
+*/
+
+function new_google_add_query_var() {
+
+  global $wp;
+  $wp->add_query_var('editProfileRedirect');
+  $wp->add_query_var('loginGoogle');
+}
+add_filter('init', 'new_google_add_query_var');
+
+/* -----------------------------------------------------------------------------
+Main function to handle the Sign in/Register/Linking process
+----------------------------------------------------------------------------- */
+
+/*
+Compatibility for older versions
+*/
+add_action('parse_request', 'new_google_login_compat');
+
+function new_google_login_compat() {
+
+  global $wp;
+  if ($wp->request == 'loginGoogle' || isset($wp->query_vars['loginGoogle'])) {
+    new_google_login_action();
+  }
+}
+
+/*
+For login page
+*/
+add_action('login_init', 'new_google_login');
+
+function new_google_login() {
+
+  if ($_REQUEST['loginGoogle'] == '1') {
+    new_google_login_action();
+  }
+}
+
+function new_google_login_action() {
+
+  global $wp, $wpdb, $new_google_settings;
+  if (isset($_GET['action']) && $_GET['action'] == 'unlink') {
+    $user_info = wp_get_current_user();
+    if ($user_info->ID) {
+      $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'social_users
+	  WHERE ID = %d
+	  AND type = \'google\'', $user_info->ID));
+    }
+    new_google_redirect();
+  }
+  include (dirname(__FILE__) . '/sdk/init.php');
+  if (isset($_GET['code'])) {
+    $client->authenticate();
+    $_SESSION['token'] = $client->getAccessToken();
+    header('Location: ' . filter_var(new_google_login_url() , FILTER_SANITIZE_URL));
+    exit;
+  }
+  if (isset($_SESSION['token'])) {
+    $client->setAccessToken($_SESSION['token']);
+  }
+  if (isset($_REQUEST['logout'])) {
+    unset($_SESSION['token']);
+    $client->revokeToken();
+  }
+  if ($client->getAccessToken()) {
+    $u = $oauth2->userinfo->get();
+
+    // The access token may have been updated lazily.
+    $_SESSION['token'] = $client->getAccessToken();
+
+    // These fields are currently filtered through the PHP sanitize filters.
+    
+    // See http://www.php.net/manual/en/filter.filters.sanitize.php
+
+    $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
+    $ID = $wpdb->get_var($wpdb->prepare('
+      SELECT ID FROM ' . $wpdb->prefix . 'social_users WHERE type = "google" AND identifier = "%d"
+    ', $u['id']));
+    if (!get_user_by('id', $ID)) {
+      $wpdb->query($wpdb->prepare('
+	DELETE FROM ' . $wpdb->prefix . 'social_users WHERE ID = "%d"
+      ', $ID));
+      $ID = null;
+    }
+    if (!is_user_logged_in()) {
+      if ($ID == NULL) { // Register
+
+	$ID = email_exists($email);
+	if ($ID == false) { // Real register
+
+	  require_once (ABSPATH . WPINC . '/registration.php');
+	  $random_password = wp_generate_password($length = 12, $include_standard_special_chars = false);
+	  if (!isset($new_google_settings['google_user_prefix'])) $new_google_settings['google_user_prefix'] = 'Google - ';
+	  $sanitized_user_login = sanitize_user($new_google_settings['google_user_prefix'] . $u['name']);
+	  if (!validate_username($sanitized_user_login)) {
+	    $sanitized_user_login = sanitize_user('google' . $user_profile['id']);
+	  }
+	  $defaul_user_name = $sanitized_user_login;
+	  $i = 1;
+	  while (username_exists($sanitized_user_login)) {
+	    $sanitized_user_login = $defaul_user_name . $i;
+	    $i++;
+	  }
+	  $ID = wp_create_user($sanitized_user_login, $random_password, $email);
+	  if (!is_wp_error($ID)) {
+	    wp_new_user_notification($ID, $random_password);
+	    $user_info = get_userdata($ID);
+	    wp_update_user(array(
+	      'ID' => $ID,
+	      'display_name' => $u['name'],
+	      'first_name' => $u['given_name'],
+	      'last_name' => $u['family_name'],
+	      'googleplus' => $u['link']
+	    ));
+	    update_user_meta($ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/' . $u['id']);
+	    do_action('nextend_google_user_registered', $u, $oauth2);
+	  } else {
+	    return;
+	  }
 	}
-}
+	if ($ID) {
+	  $wpdb->insert($wpdb->prefix . 'social_users', array(
+	    'ID' => $ID,
+	    'type' => 'google',
+	    'identifier' => $u['id']
+	  ) , array(
+	    '%d',
+	    '%s',
+	    '%s'
+	  ));
+	}
+	if (isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto') {
+	  $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
+	}
+      }
+      if ($ID) { // Login
 
-if(!class_exists('NextendGoogleSettings')) {
-class NextendGoogleSettings {
-function NextendGoogle_Options_Page() {
-  $domain = get_option('siteurl');
-  $domain = str_replace(array('http://', 'https://'), array('',''), $domain);
-  $domain = str_replace('www.', '', $domain);
-  $a = explode("/",$domain);
-  $domain = $a[0]; 
-	?>
+	$secure_cookie = is_ssl();
+	$secure_cookie = apply_filters('secure_signon_cookie', $secure_cookie, array());
+	global $auth_secure_cookie; // XXX ugly hack to pass this to wp_authenticate_cookie
 
-	<div class="wrap">
-	<div id="newgoogle-options">
-	<div id="newgoogle-title"><h2>Nextend Google Connect Settings</h2></div>
-	<?php
-	global $newgoogle_status;
-	if($newgoogle_status == 'update_success')
-		$message =__('Configuration updated', 'nextend-google-connect') . "<br />";
-	else if($newgoogle_status == 'update_failed')
-		$message =__('Error while saving options', 'nextend-google-connect') . "<br />";
-	else
-		$message = '';
+	$auth_secure_cookie = $secure_cookie;
+	wp_set_auth_cookie($ID, true, $secure_cookie);
+	$user_info = get_userdata($ID);
+	do_action('wp_login', $user_info->user_login, $user_info);
+	do_action('nextend_google_user_logged_in', $u, $oauth2);
+      }
+    } else {
+      if (new_google_is_user_connected()) {
 
-	if($message != "") {
-	?>
-		<div class="updated"><strong><p><?php
-		echo $message;
-		?></p></strong></div><?php
-	} ?>
-	<div id="newgoogle-desc">
-	<p><?php _e('This plugins helps you create Google login and register buttons. The login and register process only takes one click and you can fully customize the buttons with images and other assets.', 'nextend-google-connect'); ?></p>
-	<h3><?php _e('Setup', 'nextend-google-connect'); ?></h3>
-  <p>
-  <?php _e('<ol><li><a href="https://www.google.com/accounts/ManageDomains" target="_blank">Add your domain to Google system!</a></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>The bottom of the page will contain a link to your domain. Click on it and follow Google\'s veryfication steps.</li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>After you are done, <a href="https://code.google.com/apis/console" target="_blank">We have to create and API access.</a></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Create a new API access with your product name.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi11.png" /></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Search for the Google+ API row and enable the service</li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Then click on the API access panel and create and OAuth 2 clien ID!<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi21.png" /></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Product name can be anything then click on next.</li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Click on the <b>more options</b> link and copy and paste <b>'.new_google_login_url().'</b> to the textarea.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi31.png" /></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li>Now you should use the values in the fields below.<br><img src="http://www.nextendweb.com/wp-content/uploads/2012/10/googleapi4.png" /></li>', 'nextend-google-connect'); ?>
-  <?php _e('<li><b>Save changes!</b></li></ol>', 'nextend-google-connect'); ?>
-  
-  
-  </p>
-  <h3><?php _e('Usage', 'nextend-google-connect'); ?></h3>
-  <h4><?php _e('Simple link', 'nextend-google-connect'); ?></h4>
-	<p><?php _e('&lt;a href="'.new_google_login_url().'&redirect='.get_option('siteurl').'" onclick="window.location = \''.new_google_login_url().'&redirect=\'+window.location.href; return false;"&gt;Click here to login or register with google&lt;/a&gt;', 'nextend-google-connect'); ?></p>
+	// It was a simple login
 	
-  <h4><?php _e('Image button', 'nextend-google-connect'); ?></h4>
-	<p><?php _e('&lt;a href="'.new_google_login_url().'&redirect='.get_option('siteurl').'" onclick="window.location = \''.new_google_login_url().'&redirect=\'+window.location.href; return false;"&gt; &lt;img src="HereComeTheImage" /&gt; &lt;/a&gt;', 'nextend-google-connect'); ?></p>
-  
-  <h3><?php _e('Note', 'nextend-google-connect'); ?></h3>
-  <p><?php _e('If the google user\'s email address already used by another member of your site, the google profile will be automatically linked to the existing profile!', 'nextend-google-connect'); ?></p>
-  
-  </div>
+      } elseif ($ID === NULL) { // Let's connect the account to the current user!
 
-	<!--right-->
-	<div class="postbox-container" style="float:right;width:30%;">
-	<div class="metabox-holder">
-	<div class="meta-box-sortables">
-
-	<!--about-->
-	<div id="newgoogle-about" class="postbox">
-	<h3 class="hndle"><?php _e('About this plugin', 'nextend-google-connect'); ?></h3>
-	<div class="inside"><ul>
-  
-  <li><a href="http://www.nextendweb.com/social-connect-plugins-for-wordpress.html" target="_blank"><?php _e('Check the realted <b>blog post</b>!', 'nextend-google-connect'); ?></a></li>
-	<li><br></li>
-	<li><a href="http://wordpress.org/extend/plugins/nextend-google-connect/" target="_blank"><?php _e('Nextend Google Connect', 'nextend-google-connect'); ?></a></li>
-	<li><br></li>
-  <li><a href="http://profiles.wordpress.org/nextendweb" target="_blank"><?php _e('Nextend  plugins at WordPress.org', 'nextend-google-connect'); ?></a></li>
-	</ul></div>
-	</div>
-	<!--about end-->
-
-	<!--others-->
-	<!--others end-->
-
-	</div></div></div>
-	<!--right end-->
-
-	<!--left-->
-	<div class="postbox-container" style="float:left;width: 69%;">
-	<div class="metabox-holder">
-	<div class="meta-box-sortabless">
-
-	<!--setting-->
-	<div id="newgoogle-setting" class="postbox">
-	<h3 class="hndle"><?php _e('Settings', 'nextend-google-connect'); ?></h3>
-	<?php $nextend_google_connect = maybe_unserialize(get_option('nextend_google_connect')); ?>
-
-	<form method="post" action="<?php echo get_bloginfo("wpurl"); ?>/wp-admin/options-general.php?page=nextend-google-connect">
-	<input type="hidden" name="newgoogle_update_options" value="Y">
-
-	<table class="form-table">
-		<tr>
-		<th scope="row"><?php _e('Google Client ID:', 'nextend-google-connect'); ?></th>
-		<td>
-		<input type="text" name="google_client_id" value="<?php echo $nextend_google_connect['google_client_id']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('Google Client Secret:', 'nextend-google-connect'); ?></th>
-		<td>
-		<input type="text" name="google_client_secret" value="<?php echo $nextend_google_connect['google_client_secret']; ?>" />
-		</td>
-		</tr>
-    
-    <tr>
-		<th scope="row"><?php _e('Google API key:', 'nextend-google-connect'); ?></th>
-		<td>
-		<input type="text" name="google_api_key" value="<?php echo $nextend_google_connect['google_api_key']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
-		<td>
-    <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Google - '; ?>
-		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
-		<td>
-    <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Facebook - '; ?>
-		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('Fixed redirect url for login:', 'nextend-google-connect'); ?></th>
-		<td>
-    <?php if(!isset($nextend_google_connect['google_redirect'])) $nextend_google_connect['google_redirect'] = 'auto'; ?>
-		<input type="text" name="google_redirect" value="<?php echo $nextend_google_connect['google_redirect']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('Fixed redirect url for register:', 'nextend-google-connect'); ?></th>
-		<td>
-    <?php if(!isset($nextend_google_connect['google_redirect_reg'])) $nextend_google_connect['google_redirect_reg'] = 'auto'; ?>
-		<input type="text" name="google_redirect_reg" value="<?php echo $nextend_google_connect['google_redirect_reg']; ?>" />
-		</td>
-		</tr>
-
-		<tr>
-		<th scope="row"><?php _e('Load button stylesheet:', 'nextend-google-connect'); ?></th>
-		<td>
-    <?php if(!isset($nextend_google_connect['google_load_style'])) $nextend_google_connect['google_load_style'] = 1; ?>
-		<input name="google_load_style" id="google_load_style_yes" value="1" type="radio" <?php if(isset($nextend_google_connect['google_load_style']) && $nextend_google_connect['google_load_style']){?> checked <?php } ?>> Yes  &nbsp;&nbsp;&nbsp;&nbsp;
-    <input name="google_load_style" id="google_load_style_no" value="0" type="radio" <?php if(isset($nextend_google_connect['google_load_style']) && $nextend_google_connect['google_load_style'] == 0){?> checked <?php } ?>> No		
-		</td>
-		</tr>
-    
-    <tr>
-		<th scope="row"><?php _e('Login button:', 'nextend-google-connect'); ?></th>
-		<td>
-      <?php if(!isset($nextend_google_connect['google_login_button'])) $nextend_google_connect['google_login_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">CONNECT WITH</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_login_button"><?php echo $nextend_google_connect['google_login_button']; ?></textarea>
-		</td>
-		</tr>
-    
-    <tr>
-		<th scope="row"><?php _e('Link account button:', 'nextend-google-connect'); ?></th>
-		<td>
-      <?php if(!isset($nextend_google_connect['google_link_button'])) $nextend_google_connect['google_link_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">LINK ACCOUNT TO</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_link_button"><?php echo $nextend_google_connect['google_link_button']; ?></textarea>
-		</td>
-		</tr>
-    
-    <tr>
-		<th scope="row"><?php _e('Unlink account button:', 'nextend-google-connect'); ?></th>
-		<td>
-      <?php if(!isset($nextend_google_connect['google_unlink_button'])) $nextend_google_connect['google_unlink_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">UNLINK ACCOUNT</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_unlink_button"><?php echo $nextend_google_connect['google_unlink_button']; ?></textarea>
-		</td>
-		</tr>
-    
-    <tr>
-		<th scope="row"></th>
-		<td>
-    <a href="http://www.nextendweb.com/social-connect-button-generator" target="_blank"><img style="margin-left: -4px;" src="<?php echo plugins_url('generatorbanner.png', __FILE__); ?>" /></a>
-    </td>
-		</tr>
-	</table>
-
-	<p class="submit">
-	<input style="margin-left: 10%;" type="submit" name="Submit" value="<?php _e('Save Changes', 'nextend-google-connect'); ?>" />
-	</p>
-	</form>
-	</div>
-	<!--setting end-->
-
-	<!--others-->
-	<!--others end-->
-
-	</div></div></div>
-	<!--left end-->
-
-	</div>
-	</div>
-	<?php
+	$current_user = wp_get_current_user();
+	$wpdb->insert($wpdb->prefix . 'social_users', array(
+	  'ID' => $current_user->ID,
+	  'type' => 'google',
+	  'identifier' => $u['id']
+	) , array(
+	  '%d',
+	  '%s',
+	  '%s'
+	));
+	do_action('nextend_google_user_account_linked', $u, $oauth2);
+      } else {
+	$_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
+      }
+    }
+    new_google_redirect();
+  } else {
+    if (isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto') {
+      $_GET['redirect'] = $new_google_settings['google_redirect'];
+    }
+    if (isset($_GET['redirect'])) {
+      $_SESSION['redirect'] = $_GET['redirect'];
+    }
+    if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
+      $_SESSION['redirect'] = site_url();
+    }
+    header('LOCATION: ' . $client->createAuthUrl());
+    exit;
+  }
 }
 
-function NextendGoogle_Menu() {
-	add_options_page(__('Nextend Google Connect'), __('Nextend Google Connect'), 'manage_options', 'nextend-google-connect', array(__CLASS__,'NextendGoogle_Options_Page'));
+/*
+Is the current user connected the Google profile?
+*/
+
+function new_google_is_user_connected() {
+
+  global $wpdb;
+  $current_user = wp_get_current_user();
+  $ID = $wpdb->get_var($wpdb->prepare('
+    SELECT identifier FROM ' . $wpdb->prefix . 'social_users WHERE type = "google" AND ID = "%d"
+  ', $current_user->ID));
+  if ($ID === NULL) return false;
+  return $ID;
 }
 
-}
-}
+/*
+Connect Field in the Profile page
+*/
+
+function new_add_google_connect_field() {
+
+  global $new_is_social_header;
+  if ($new_is_social_header === NULL) {
 ?>
+    <h3>Social connect</h3>
+    <?php
+    $new_is_social_header = true;
+  }
+?>
+  <table class="form-table">
+    <tbody>
+      <tr>	
+	<th></th>	
+	<td>
+	  <?php
+  if (new_google_is_user_connected()) {
+    echo new_google_unlink_button();
+  } else {
+    echo new_google_link_button();
+  }
+?>
+	</td>
+      </tr>
+    </tbody>
+  </table>
+  <?php
+}
+add_action('profile_personal_options', 'new_add_google_connect_field');
+
+function new_add_google_login_form() {
+
+?>
+  <script>
+  if(jQuery.type(has_social_form) === "undefined"){
+    var has_social_form = false;
+    var socialLogins = null;
+  }
+  jQuery(document).ready(function(){
+    (function($) {
+      if(!has_social_form){
+	has_social_form = true;
+	var loginForm = $('#loginform,#registerform,#front-login-form');
+	socialLogins = $('<div class="newsociallogins" style="text-align: center;"><div style="clear:both;"></div></div>');
+	if(loginForm.find('input').length > 0)
+	  loginForm.prepend("<h3 style='text-align:center;'>OR</h3>");
+	loginForm.prepend(socialLogins);
+      }
+      if(!window.google_added){
+	socialLogins.prepend('<?php echo addslashes(preg_replace('/^\s+|\n|\r|\s+$/m', '', new_google_sign_button())); ?>');
+	window.google_added = true;
+      }
+    }(jQuery));
+  });
+  </script>
+  <?php
+}
+add_action('login_form', 'new_add_google_login_form');
+add_action('register_form', 'new_add_google_login_form');
+add_action('bp_sidebar_login_form', 'new_add_google_login_form');
+add_filter('get_avatar', 'new_google_insert_avatar', 1, 5);
+
+function new_google_insert_avatar($avatar = '', $id_or_email, $size = 96, $default = '', $alt = false) {
+
+  $id = 0;
+  if (is_numeric($id_or_email)) {
+    $id = $id_or_email;
+  } else if (is_string($id_or_email)) {
+    $u = get_user_by('email', $id_or_email);
+    $id = $u->id;
+  } else if (is_object($id_or_email)) {
+    $id = $id_or_email->user_id;
+  }
+  if ($id == 0) return $avatar;
+  $pic = get_user_meta($id, 'google_profile_picture', true);
+  if (!$pic || $pic == '') return $avatar;
+  $avatar = preg_replace('/src=("|\').*?("|\')/i', 'src="' . $pic . '"', $avatar);
+  return $avatar;
+}
+
+/*
+Options Page
+*/
+require_once (trailingslashit(dirname(__FILE__)) . "nextend-google-settings.php");
+if (class_exists('NextendGoogleSettings')) {
+  $nextendgooglesettings = new NextendGoogleSettings();
+  if (isset($nextendgooglesettings)) {
+    add_action('admin_menu', array(&$nextendgooglesettings,
+      'NextendGoogle_Menu'
+    ) , 1);
+  }
+}
+add_filter('plugin_action_links', 'new_google_plugin_action_links', 10, 2);
+
+function new_google_plugin_action_links($links, $file) {
+
+  if ($file != NEW_GOOGLE_LOGIN_PLUGIN_BASENAME) return $links;
+  $settings_link = '<a href="' . menu_page_url('nextend-google-connect', false) . '">' . esc_html(__('Settings', 'nextend-google-connect')) . '</a>';
+  array_unshift($links, $settings_link);
+  return $links;
+}
+
+/* -----------------------------------------------------------------------------
+Miscellaneous functions
+----------------------------------------------------------------------------- */
+
+function new_google_sign_button() {
+
+  global $new_google_settings;
+  return '<a href="' . new_google_login_url() . (isset($_GET['redirect_to']) ? '&redirect=' . $_GET['redirect_to'] : '') . '" rel="nofollow">' . $new_google_settings['google_login_button'] . '</a><br />';
+}
+
+function new_google_link_button() {
+
+  global $new_google_settings;
+  return '<a href="' . new_google_login_url() . '&redirect=' . new_google_curPageURL() . '">' . $new_google_settings['google_link_button'] . '</a><br />';
+}
+
+function new_google_unlink_button() {
+
+  global $new_google_settings;
+  return '<a href="' . new_google_login_url() . '&action=unlink&redirect=' . new_google_curPageURL() . '">' . $new_google_settings['google_unlink_button'] . '</a><br />';
+}
+
+function new_google_curPageURL() {
+
+  $pageURL = 'http';
+  if (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") {
+    $pageURL.= "s";
+  }
+  $pageURL.= "://";
+  if ($_SERVER["SERVER_PORT"] != "80") {
+    $pageURL.= $_SERVER["SERVER_NAME"] . ":" . $_SERVER["SERVER_PORT"] . $_SERVER["REQUEST_URI"];
+  } else {
+    $pageURL.= $_SERVER["SERVER_NAME"] . $_SERVER["REQUEST_URI"];
+  }
+  return $pageURL;
+}
+
+function new_google_login_url() {
+
+  return site_url('wp-login.php') . '?loginGoogle=1';
+}
+
+function new_google_redirect() {
+
+  if (!isset($_SESSION['redirect']) || $_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
+    if (isset($_GET['redirect'])) {
+      $_SESSION['redirect'] = $_GET['redirect'];
+    } else {
+      $_SESSION['redirect'] = site_url();
+    }
+  }
+  header('LOCATION: ' . $_SESSION['redirect']);
+  unset($_SESSION['redirect']);
+  exit;
+}
+
+function new_google_edit_profile_redirect() {
+
+  global $wp;
+  if (isset($wp->query_vars['editProfileRedirect'])) {
+    if (function_exists('bp_loggedin_user_domain')) {
+      header('LOCATION: ' . bp_loggedin_user_domain() . 'profile/edit/group/1/');
+    } else {
+      header('LOCATION: ' . self_admin_url('profile.php'));
+    }
+    exit;
+  }
+}
+add_action('parse_request', 'new_google_edit_profile_redirect');
+
+function new_google_jquery() {
+
+  wp_enqueue_script('jquery');
+}
+add_action('login_form_login', 'new_google_jquery');
+add_action('login_form_register', 'new_google_jquery');
+
+/*
+Session notices used in the profile settings
+*/
+
+function new_google_admin_notice() {
+
+  if (isset($_SESSION['new_google_admin_notice'])) {
+    echo '<div class="updated">
+       <p>' . $_SESSION['new_google_admin_notice'] . '</p>
+    </div>';
+    unset($_SESSION['new_google_admin_notice']);
+  }
+}
+add_action('admin_notices', 'new_google_admin_notice');
