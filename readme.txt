@@ -4,7 +4,7 @@ Tags: google, register, login, social connect, social, google connect
 Donate link: https://www.facebook.com/nextendweb
 Requires at least: 3.0
 Tested up to: 3.4
-Stable tag: 1.4.47
+Stable tag: 1.4.48
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,7 +60,7 @@ After you activated the plugin, the plugin will autmatically
 
 == Changelog ==
 
-= 1.4.47 =
+= 1.4.48 =
 * Redirection fix
 * Optimalizations
 
