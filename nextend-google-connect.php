@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.50
+Version: 1.4.51
 Author: Roland Soos
 License: GPL2
 */
@@ -125,10 +125,25 @@ function new_google_login() {
 }
 
 function new_google_login_action() {
-
   global $wp, $wpdb, $new_google_settings;
+  
+  if (isset($_GET['action']) && $_GET['action'] == 'unlink') {
+    $user_info = wp_get_current_user();
+    if ($user_info->ID) {
+      $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'social_users
+          WHERE ID = %d
+          AND type = \'google\'', $user_info->ID));
+      $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully unlinked from your account.', 'nextend-google-connect');
+    }
+    new_fb_redirect();
+  }
   include (dirname(__FILE__) . '/sdk/init.php');
+  
   if (isset($_GET['code'])) {
+    if (isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto') {
+      $_GET['redirect'] = $new_google_settings['google_redirect'];
+    }
+    $_SESSION['redirect'] = $_GET['redirect'];
     $client->authenticate();
     $_SESSION['token'] = $client->getAccessToken();
     header('Location: ' . filter_var(new_google_login_url() , FILTER_SANITIZE_URL));
@@ -153,11 +168,11 @@ function new_google_login_action() {
 
     $email = filter_var($u['email'], FILTER_SANITIZE_EMAIL);
     $ID = $wpdb->get_var($wpdb->prepare('
-      SELECT ID FROM ' . $wpdb->prefix . 'social_users WHERE type = "google" AND identifier = "%d"
+      SELECT ID FROM ' . $wpdb->prefix . 'social_users WHERE type = "google" AND identifier = "%s"
     ', $u['id']));
     if (!get_user_by('id', $ID)) {
       $wpdb->query($wpdb->prepare('
-        DELETE FROM ' . $wpdb->prefix . 'social_users WHERE ID = "%d"
+        DELETE FROM ' . $wpdb->prefix . 'social_users WHERE ID = "%s"
       ', $ID));
       $ID = null;
     }
@@ -212,7 +227,6 @@ function new_google_login_action() {
           $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
         }
       }
-      if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) $_SESSION['redirect'] = site_url();
       if ($ID) { // Login
 
         $secure_cookie = is_ssl();
@@ -225,43 +239,11 @@ function new_google_login_action() {
         do_action('wp_login', $user_info->user_login, $user_info);
         do_action('nextend_google_user_logged_in', $ID, $u, $oauth2);
         update_user_meta($ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/' . $u['id']);
-        header('Location: ' . $_SESSION['redirect']);
-        unset($_SESSION['redirect']);
-        exit;
       }
     } else {
-      if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) $_SESSION['redirect'] = site_url();
       if (new_google_is_user_connected()) { // It was a simple login
 
-        if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
-          if (isset($_GET['redirect'])) {
-            $_SESSION['redirect'] = $_GET['redirect'];
-          } else {
-            $_SESSION['redirect'] = site_url();
-          }
-        }
-        if (isset($_GET['action']) && $_GET['action'] == 'unlink') {
-          $user_info = wp_get_current_user();
-          if (get_user_meta($user_info->ID, 'new_google_default_password', true) == $user_info->user_pass) {
-
-            // Unlinking not available
-            $_SESSION['new_google_admin_notice'] = __('Your account using the default password, which generated with social register. Please change it and try again!', 'nextend-facebook-connect');
-            header('Location: ' . $_SESSION['redirect']);
-            unset($_SESSION['redirect']);
-            exit;
-          } else {
-            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'social_users
-                WHERE ID = %d
-                AND type = \'google\'', $user_info->ID));
-            header('Location: ' . $_SESSION['redirect']);
-            unset($_SESSION['redirect']);
-            exit;
-          }
-          exit;
-        }
-        header('Location: ' . $_SESSION['redirect']);
-        unset($_SESSION['redirect']);
-        exit;
+        
       } elseif ($ID === NULL) { // Let's connect the account to the current user!
 
         $current_user = wp_get_current_user();
@@ -276,24 +258,12 @@ function new_google_login_action() {
         ));
         do_action('nextend_google_user_account_linked', $ID, $u, $oauth2);
         $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
-        header('Location: ' . (isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']));
-        unset($_SESSION['redirect']);
-        exit;
       } else {
         $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
-        header('Location: ' . (isset($_SESSION['redirect']) ? $_SESSION['redirect'] : $_GET['redirect']));
-        unset($_SESSION['redirect']);
-        exit;
       }
     }
-  } else {
-    if (isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto') {
-      $_GET['redirect'] = $new_google_settings['google_redirect'];
-    }
-    $_SESSION['redirect'] = isset($_GET['redirect']) ? $_GET['redirect'] : site_url();
-    header('LOCATION: ' . $client->createAuthUrl());
-    exit;
   }
+  new_fb_redirect();
 }
 
 /*
@@ -457,6 +427,19 @@ function new_google_curPageURL() {
 function new_google_login_url() {
 
   return site_url('wp-login.php') . '?loginGoogle=1';
+}
+
+function new_google_redirect() {
+  if (!isset($_SESSION['redirect']) || $_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
+    if (isset($_GET['redirect'])) {
+      $_SESSION['redirect'] = $_GET['redirect'];
+    } else {
+      $_SESSION['redirect'] = site_url();
+    }
+  }
+  header('LOCATION: ' . $_SESSION['redirect']);
+  unset($_SESSION['redirect']);
+  exit;
 }
 
 function new_google_edit_profile_redirect() {
