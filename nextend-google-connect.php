@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.51
+Version: 1.4.52
 Author: Roland Soos
 License: GPL2
 */
@@ -361,7 +361,7 @@ function new_google_insert_avatar($avatar = '', $id_or_email, $size = 96, $defau
   if ($id == 0) return $avatar;
   $pic = get_user_meta($id, 'google_profile_picture', true);
   if (!$pic || $pic == '') return $avatar;
-  $avatar = preg_replace('/src=("|\').*?("|\')/i', 'src="' . $pic . '"', $avatar);
+  $avatar = preg_replace('/src=("|\').*?("|\')/i', 'src=\'' . $pic . '\'', $avatar);
   return $avatar;
 }
 
