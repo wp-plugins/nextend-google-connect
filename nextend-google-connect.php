@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.52
+Version: 1.4.53
 Author: Roland Soos
 License: GPL2
 */
@@ -135,7 +135,7 @@ function new_google_login_action() {
           AND type = \'google\'', $user_info->ID));
       $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully unlinked from your account.', 'nextend-google-connect');
     }
-    new_fb_redirect();
+    new_google_redirect();
   }
   include (dirname(__FILE__) . '/sdk/init.php');
   
@@ -263,7 +263,7 @@ function new_google_login_action() {
       }
     }
   }
-  new_fb_redirect();
+  new_google_redirect();
 }
 
 /*
