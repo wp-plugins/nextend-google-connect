@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.53
+Version: 1.4.54
 Author: Roland Soos
 License: GPL2
 */
@@ -262,6 +262,18 @@ function new_google_login_action() {
         $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
       }
     }
+  } else {
+    if (isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto') {
+      $_GET['redirect'] = $new_google_settings['google_redirect'];
+    }
+    if (isset($_GET['redirect'])) {
+      $_SESSION['redirect'] = $_GET['redirect'];
+    }
+    if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
+      $_SESSION['redirect'] = site_url();
+    }
+    header('LOCATION: ' . $client->createAuthUrl());
+    exit;
   }
   new_google_redirect();
 }
