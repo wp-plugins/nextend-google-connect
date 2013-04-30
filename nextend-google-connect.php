@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.54
+Version: 1.4.55
 Author: Roland Soos
 License: GPL2
 */
@@ -31,7 +31,7 @@ $new_google_settings = maybe_unserialize(get_option('nextend_google_connect'));
 /*
 Sessions required for the profile notices
 */
-
+/*
 function new_google_start_session() {
 
   if (!headers_sent()) {
@@ -48,7 +48,7 @@ function new_google_end_session() {
 add_action('init', 'new_google_start_session', 1);
 add_action('wp_logout', 'new_google_end_session');
 add_action('wp_login', 'new_google_end_session');
-
+*/
 /*
 Loading style for buttons
 */
@@ -133,7 +133,7 @@ function new_google_login_action() {
       $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'social_users
           WHERE ID = %d
           AND type = \'google\'', $user_info->ID));
-      $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully unlinked from your account.', 'nextend-google-connect');
+      set_site_transient($user_info->ID.'_new_google_admin_notice',__('Your Google profile is successfully unlinked from your account.', 'nextend-google-connect'), 3600);
     }
     new_google_redirect();
   }
@@ -143,24 +143,28 @@ function new_google_login_action() {
     if (isset($new_google_settings['google_redirect']) && $new_google_settings['google_redirect'] != '' && $new_google_settings['google_redirect'] != 'auto') {
       $_GET['redirect'] = $new_google_settings['google_redirect'];
     }
-    $_SESSION['redirect'] = $_GET['redirect'];
+    
+    setcookie('redirect', $_GET['redirect'], time() + 3600, '/');
+    $_COOKIE['redirect'] = $_GET['redirect'];
     $client->authenticate();
-    $_SESSION['token'] = $client->getAccessToken();
+    setcookie('token', $client->getAccessToken(), time() + 3600, '/');
     header('Location: ' . filter_var(new_google_login_url() , FILTER_SANITIZE_URL));
     exit;
   }
-  if (isset($_SESSION['token'])) {
-    $client->setAccessToken($_SESSION['token']);
+
+  if (isset($_COOKIE['token'])) {
+    $_COOKIE['token'] = stripslashes($_COOKIE['token']);
+    $client->setAccessToken($_COOKIE['token']);
   }
   if (isset($_REQUEST['logout'])) {
-    unset($_SESSION['token']);
+    setcookie('token', $_GET['redirect'], time() - 3600, '/');
     $client->revokeToken();
   }
   if ($client->getAccessToken()) {
     $u = $oauth2->userinfo->get();
 
     // The access token may have been updated lazily.
-    $_SESSION['token'] = $client->getAccessToken();
+    setcookie('token', $client->getAccessToken(), time() + 3600, '/');
 
     // These fields are currently filtered through the PHP sanitize filters.
     
@@ -224,7 +228,8 @@ function new_google_login_action() {
           ));
         }
         if (isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto') {
-          $_SESSION['redirect'] = $new_google_settings['google_redirect_reg'];
+          setcookie('redirect', $new_google_settings['google_redirect_reg'], time() + 3600, '/');
+          $_COOKIE['redirect'] = $new_google_settings['google_redirect_reg'];
         }
       }
       if ($ID) { // Login
@@ -257,9 +262,11 @@ function new_google_login_action() {
           '%s'
         ));
         do_action('nextend_google_user_account_linked', $ID, $u, $oauth2);
-        $_SESSION['new_google_admin_notice'] = __('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect');
+        $user_info = wp_get_current_user();
+        set_site_transient($user_info->ID.'_new_google_admin_notice',__('Your Google profile is successfully linked with your account. Now you can sign in with Google easily.', 'nextend-google-connect'), 3600);
       } else {
-        $_SESSION['new_google_admin_notice'] = __('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect');
+        $user_info = wp_get_current_user();
+        set_site_transient($user_info->ID.'_new_google_admin_notice',__('This Google profile is already linked with other account. Linking process failed!', 'nextend-google-connect'), 3600);
       }
     }
   } else {
@@ -267,10 +274,12 @@ function new_google_login_action() {
       $_GET['redirect'] = $new_google_settings['google_redirect'];
     }
     if (isset($_GET['redirect'])) {
-      $_SESSION['redirect'] = $_GET['redirect'];
+      $_COOKIE['redirect'] = $_GET['redirect'];
+      setcookie('redirect', $_COOKIE['redirect'], time() + 3600, '/');
     }
-    if ($_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
-      $_SESSION['redirect'] = site_url();
+    if ($_COOKIE['redirect'] == '' || $_COOKIE['redirect'] == new_google_login_url()) {
+      $_COOKIE['redirect'] = site_url();
+      setcookie('redirect', $_COOKIE['redirect'], time() + 3600, '/');
     }
     header('LOCATION: ' . $client->createAuthUrl());
     exit;
@@ -442,15 +451,15 @@ function new_google_login_url() {
 }
 
 function new_google_redirect() {
-  if (!isset($_SESSION['redirect']) || $_SESSION['redirect'] == '' || $_SESSION['redirect'] == new_google_login_url()) {
+  if (!isset($_COOKIE['redirect']) || $_COOKIE['redirect'] == '' || $_COOKIE['redirect'] == new_google_login_url()) {
     if (isset($_GET['redirect'])) {
-      $_SESSION['redirect'] = $_GET['redirect'];
+      $_COOKIE['redirect'] = $_GET['redirect'];
     } else {
-      $_SESSION['redirect'] = site_url();
+      $_COOKIE['redirect'] = site_url();
     }
   }
-  header('LOCATION: ' . $_SESSION['redirect']);
-  unset($_SESSION['redirect']);
+  header('LOCATION: ' . $_COOKIE['redirect']);
+  setcookie('redirect', $_COOKIE['redirect'], time() - 3600, '/');
   exit;
 }
 
@@ -480,12 +489,13 @@ Session notices used in the profile settings
 */
 
 function new_google_admin_notice() {
-
-  if (isset($_SESSION['new_google_admin_notice'])) {
+  $user_info = wp_get_current_user();
+  $notice = get_site_transient($user_info->ID.'_new_google_admin_notice');
+  if ($notice !== false) {
     echo '<div class="updated">
-       <p>' . $_SESSION['new_google_admin_notice'] . '</p>
+       <p>' . $notice . '</p>
     </div>';
-    unset($_SESSION['new_google_admin_notice']);
+    delete_site_transient($user_info->ID.'_new_google_admin_notice');
   }
 }
 add_action('admin_notices', 'new_google_admin_notice');
