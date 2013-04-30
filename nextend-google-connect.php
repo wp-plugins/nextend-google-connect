@@ -4,7 +4,7 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.55
+Version: 1.4.56
 Author: Roland Soos
 License: GPL2
 */
@@ -28,27 +28,21 @@ define('NEW_GOOGLE_LOGIN', 1);
 if (!defined('NEW_GOOGLE_LOGIN_PLUGIN_BASENAME')) define('NEW_GOOGLE_LOGIN_PLUGIN_BASENAME', plugin_basename(__FILE__));
 $new_google_settings = maybe_unserialize(get_option('nextend_google_connect'));
 
-/*
-Sessions required for the profile notices
-*/
-/*
-function new_google_start_session() {
-
-  if (!headers_sent()) {
-    if (!session_id()) {
-      session_start();
+if(!function_exists('nextend_uniqid')){
+    function nextend_uniqid(){
+        if(isset($_COOKIE['nextend_uniqid'])){
+            if(get_site_transient('n_'.$_COOKIE['nextend_uniqid']) !== false){
+                return $_COOKIE['nextend_uniqid'];
+            }
+        }
+        $_COOKIE['nextend_uniqid'] = uniqid('nextend', true);
+        setcookie('nextend_uniqid', $_COOKIE['nextend_uniqid'], time() + 3600, '/');
+        set_site_transient('n_'.$_COOKIE['nextend_uniqid'], 1, 3600);
+        
+        return $_COOKIE['nextend_uniqid'];
     }
-  }
 }
 
-function new_google_end_session() {
-
-  if (session_id()) session_destroy();
-}
-add_action('init', 'new_google_start_session', 1);
-add_action('wp_logout', 'new_google_end_session');
-add_action('wp_login', 'new_google_end_session');
-*/
 /*
 Loading style for buttons
 */
@@ -144,27 +138,29 @@ function new_google_login_action() {
       $_GET['redirect'] = $new_google_settings['google_redirect'];
     }
     
-    setcookie('redirect', $_GET['redirect'], time() + 3600, '/');
-    $_COOKIE['redirect'] = $_GET['redirect'];
+    set_site_transient( nextend_uniqid().'_google_r', $_GET['redirect'], 3600);
+    
     $client->authenticate();
-    setcookie('token', $client->getAccessToken(), time() + 3600, '/');
+    $access_token = $client->getAccessToken();
+    set_site_transient( nextend_uniqid().'_google_at', $access_token, 3600);
     header('Location: ' . filter_var(new_google_login_url() , FILTER_SANITIZE_URL));
     exit;
   }
+  
+  $access_token = get_site_transient( nextend_uniqid().'_google_at');
 
-  if (isset($_COOKIE['token'])) {
-    $_COOKIE['token'] = stripslashes($_COOKIE['token']);
-    $client->setAccessToken($_COOKIE['token']);
+  if ($access_token !== false) {
+    $client->setAccessToken($access_token);
   }
   if (isset($_REQUEST['logout'])) {
-    setcookie('token', $_GET['redirect'], time() - 3600, '/');
+    delete_site_transient( nextend_uniqid().'_google_at');
     $client->revokeToken();
   }
   if ($client->getAccessToken()) {
     $u = $oauth2->userinfo->get();
 
     // The access token may have been updated lazily.
-    setcookie('token', $client->getAccessToken(), time() + 3600, '/');
+    set_site_transient( nextend_uniqid().'_google_at', $client->getAccessToken(), 3600);
 
     // These fields are currently filtered through the PHP sanitize filters.
     
@@ -228,8 +224,7 @@ function new_google_login_action() {
           ));
         }
         if (isset($new_google_settings['google_redirect_reg']) && $new_google_settings['google_redirect_reg'] != '' && $new_google_settings['google_redirect_reg'] != 'auto') {
-          setcookie('redirect', $new_google_settings['google_redirect_reg'], time() + 3600, '/');
-          $_COOKIE['redirect'] = $new_google_settings['google_redirect_reg'];
+          set_site_transient( nextend_uniqid().'_google_r', $new_google_settings['google_redirect_reg'], 3600);
         }
       }
       if ($ID) { // Login
@@ -274,12 +269,14 @@ function new_google_login_action() {
       $_GET['redirect'] = $new_google_settings['google_redirect'];
     }
     if (isset($_GET['redirect'])) {
-      $_COOKIE['redirect'] = $_GET['redirect'];
-      setcookie('redirect', $_COOKIE['redirect'], time() + 3600, '/');
+      set_site_transient( nextend_uniqid().'_google_r', $_GET['redirect'], 3600);
     }
-    if ($_COOKIE['redirect'] == '' || $_COOKIE['redirect'] == new_google_login_url()) {
-      $_COOKIE['redirect'] = site_url();
-      setcookie('redirect', $_COOKIE['redirect'], time() + 3600, '/');
+    
+    $redirect = get_site_transient( nextend_uniqid().'_google_r');
+    
+    if ($redirect || $redirect == new_google_login_url()) {
+      $redirect = site_url();
+      set_site_transient( nextend_uniqid().'_google_r', $redirect, 3600);
     }
     header('LOCATION: ' . $client->createAuthUrl());
     exit;
@@ -451,15 +448,18 @@ function new_google_login_url() {
 }
 
 function new_google_redirect() {
-  if (!isset($_COOKIE['redirect']) || $_COOKIE['redirect'] == '' || $_COOKIE['redirect'] == new_google_login_url()) {
+  
+  $redirect = get_site_transient( nextend_uniqid().'_google_r');
+  
+  if (!$redirect || $redirect == '' || $redirect == new_google_login_url()) {
     if (isset($_GET['redirect'])) {
-      $_COOKIE['redirect'] = $_GET['redirect'];
+      $redirect = $_GET['redirect'];
     } else {
-      $_COOKIE['redirect'] = site_url();
+      $redirect = site_url();
     }
   }
-  header('LOCATION: ' . $_COOKIE['redirect']);
-  setcookie('redirect', $_COOKIE['redirect'], time() - 3600, '/');
+  header('LOCATION: ' . $redirect);
+  delete_site_transient( nextend_uniqid().'_google_r');
   exit;
 }
 
