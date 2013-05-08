@@ -60,6 +60,10 @@ After you activated the plugin, the plugin will autmatically
 
 == Changelog ==
 
+= 1.4.57 =
+* Avatar fix
+* Buddypress avatar support. If Buddypress avatar not exists, then Google avatar used. If there is a BuddyPress avatar, that will be used.
+
 = 1.4.56 =
 * Fix: WordPress transient functions used to store the required session variables. $_SESSION fully removed. Beta!!!
 
