@@ -4,8 +4,8 @@
 Plugin Name: Nextend Google Connect
 Plugin URI: http://nextendweb.com/
 Description: Google connect
-Version: 1.4.58
-Author: Roland Soos
+Version: 1.5.0
+Author: Roland Soos, Jamie Bainbridge
 License: GPL2
 */
 
@@ -238,7 +238,15 @@ function new_google_login_action() {
         $user_info = get_userdata($ID);
         do_action('wp_login', $user_info->user_login, $user_info);
         do_action('nextend_google_user_logged_in', $ID, $u, $oauth2);
-        update_user_meta($ID, 'google_profile_picture', 'https://profiles.google.com/s2/photos/profile/' . $u['id']);
+        
+        // @Jamie Bainbridge fix for Google Avatars
+        $userJSON = @file_get_contents('http://picasaweb.google.com/data/entry/api/user/' . $u['id'] .'?alt=json');
+        if($userJSON){
+            $userArray = json_decode($userJSON, true);
+            if($userArray && isset($userArray["entry"]) && isset($userArray["entry"]["gphoto\$thumbnail"]) && isset($userArray["entry"]["gphoto\$thumbnail"]["\$t"])){
+                update_user_meta($ID, 'google_profile_picture', $userArray["entry"]["gphoto\$thumbnail"]["\$t"]);
+            }
+        }
       }
     } else {
       if (new_google_is_user_connected()) { // It was a simple login
@@ -468,6 +476,8 @@ function new_google_redirect() {
       $redirect = site_url();
     }
   }
+  $redirect = wp_sanitize_redirect($redirect);
+  $redirect = wp_validate_redirect($redirect, site_url());
   header('LOCATION: ' . $redirect);
   delete_site_transient( nextend_uniqid().'_google_r');
   exit;
