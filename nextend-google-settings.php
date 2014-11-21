@@ -1,15 +1,21 @@
 <?php
 /*
-Nextend Twitter Connect Settings Page
+Nextend Google Connect Settings Page
 */
-
-$newfb_status = "normal";
 
 if(isset($_POST['newgoogle_update_options'])) {
 	if($_POST['newgoogle_update_options'] == 'Y') {
     foreach($_POST AS $k => $v){
       $_POST[$k] = stripslashes($v);
     }
+    unset($_POST['Submit']);
+    $sanitize = array('newgoogle_update_options', 'google_client_id', 'google_client_secret', 'google_api_key', 'google_redirect', 'google_redirect_reg', 'google_load_style');
+    foreach($sanitize AS $k){
+        $_POST[$k] =  sanitize_text_field($_POST[$k]);
+    }
+    
+    $_POST['google_user_prefix'] = preg_replace("/[^A-Za-z0-9\-_ ]/", '', $_POST['google_user_prefix']);
+    
 		update_option("nextend_google_connect", maybe_serialize($_POST));
 		$newgoogle_status = 'update_success';
 	}
@@ -114,21 +120,21 @@ function NextendGoogle_Options_Page() {
 		<tr>
 		<th scope="row"><?php _e('Google Client ID:', 'nextend-google-connect'); ?></th>
 		<td>
-		<input type="text" name="google_client_id" value="<?php echo $nextend_google_connect['google_client_id']; ?>" />
+		<input type="text" name="google_client_id" value="<?php echo esc_html($nextend_google_connect['google_client_id']); ?>" />
 		</td>
 		</tr>
 
 		<tr>
 		<th scope="row"><?php _e('Google Client Secret:', 'nextend-google-connect'); ?></th>
 		<td>
-		<input type="text" name="google_client_secret" value="<?php echo $nextend_google_connect['google_client_secret']; ?>" />
+		<input type="text" name="google_client_secret" value="<?php echo esc_html($nextend_google_connect['google_client_secret']); ?>" />
 		</td>
 		</tr>
     
     <tr>
 		<th scope="row"><?php _e('Google API key:', 'nextend-google-connect'); ?></th>
 		<td>
-		<input type="text" name="google_api_key" value="<?php echo $nextend_google_connect['google_api_key']; ?>" />
+		<input type="text" name="google_api_key" value="<?php echo esc_html($nextend_google_connect['google_api_key']); ?>" />
 		</td>
 		</tr>
 
@@ -136,7 +142,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Google - '; ?>
-		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
+		<input type="text" name="google_user_prefix" value="<?php echo esc_html($nextend_google_connect['google_user_prefix']); ?>" />
 		</td>
 		</tr>
 
@@ -144,7 +150,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('New user prefix:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_user_prefix'])) $nextend_google_connect['google_user_prefix'] = 'Facebook - '; ?>
-		<input type="text" name="google_user_prefix" value="<?php echo $nextend_google_connect['google_user_prefix']; ?>" />
+		<input type="text" name="google_user_prefix" value="<?php echo esc_html($nextend_google_connect['google_user_prefix']); ?>" />
 		</td>
 		</tr>
 
@@ -152,7 +158,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Fixed redirect url for login:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_redirect'])) $nextend_google_connect['google_redirect'] = 'auto'; ?>
-		<input type="text" name="google_redirect" value="<?php echo $nextend_google_connect['google_redirect']; ?>" />
+		<input type="text" name="google_redirect" value="<?php echo esc_html($nextend_google_connect['google_redirect']); ?>" />
 		</td>
 		</tr>
 
@@ -160,7 +166,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Fixed redirect url for register:', 'nextend-google-connect'); ?></th>
 		<td>
     <?php if(!isset($nextend_google_connect['google_redirect_reg'])) $nextend_google_connect['google_redirect_reg'] = 'auto'; ?>
-		<input type="text" name="google_redirect_reg" value="<?php echo $nextend_google_connect['google_redirect_reg']; ?>" />
+		<input type="text" name="google_redirect_reg" value="<?php echo esc_html($nextend_google_connect['google_redirect_reg']); ?>" />
 		</td>
 		</tr>
 
@@ -177,7 +183,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Login button:', 'nextend-google-connect'); ?></th>
 		<td>
       <?php if(!isset($nextend_google_connect['google_login_button'])) $nextend_google_connect['google_login_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">CONNECT WITH</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_login_button"><?php echo $nextend_google_connect['google_login_button']; ?></textarea>
+		  <textarea cols="83" rows="3" name="google_login_button"><?php echo esc_html($nextend_google_connect['google_login_button']); ?></textarea>
 		</td>
 		</tr>
     
@@ -185,7 +191,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Link account button:', 'nextend-google-connect'); ?></th>
 		<td>
       <?php if(!isset($nextend_google_connect['google_link_button'])) $nextend_google_connect['google_link_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">LINK ACCOUNT TO</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_link_button"><?php echo $nextend_google_connect['google_link_button']; ?></textarea>
+		  <textarea cols="83" rows="3" name="google_link_button"><?php echo esc_html($nextend_google_connect['google_link_button']); ?></textarea>
 		</td>
 		</tr>
     
@@ -193,7 +199,7 @@ function NextendGoogle_Options_Page() {
 		<th scope="row"><?php _e('Unlink account button:', 'nextend-google-connect'); ?></th>
 		<td>
       <?php if(!isset($nextend_google_connect['google_unlink_button'])) $nextend_google_connect['google_unlink_button'] = '<div class="new-google-btn new-google-1 new-google-default-anim"><div class="new-google-1-1"><div class="new-google-1-1-1">UNLINK ACCOUNT</div></div></div>'; ?>
-		  <textarea cols="83" rows="3" name="google_unlink_button"><?php echo $nextend_google_connect['google_unlink_button']; ?></textarea>
+		  <textarea cols="83" rows="3" name="google_unlink_button"><?php echo esc_html($nextend_google_connect['google_unlink_button']); ?></textarea>
 		</td>
 		</tr>
     
